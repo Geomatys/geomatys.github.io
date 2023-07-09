@@ -1,0 +1,10 @@
+#
+# Jekyll configuration.
+#
+title:           Geomatys on GitHub
+url:             "https://geomatys.github.io"
+baseurl:         ""
+github_username: geomatys
+theme:           minima
+plugins:
+  - jekyll-feed

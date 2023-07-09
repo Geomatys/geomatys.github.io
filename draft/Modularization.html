@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Multiple Java modules in a single Gradle sub-project</title>
+    <meta charset="UTF-8">
+    <style>
+      h2 {
+        border-top: solid;
+        border-width: 6px;
+        border-color: DarkTurquoise;
+        margin-top:  80px;
+        padding-top: 80px;
+      }
+      h3 {
+        margin-top:   48px;
+        margin-bottom: 9px;
+      }
+      h4 {
+        margin-top:   32px;
+        margin-bottom: 9px;
+      }
+      p {
+        text-align: justify;
+        font-size:  16px;
+      }
+      blockquote, li {
+        font-size: 16px;
+      }
+      pre {
+        font-size: 14px;
+      }
+      pre.snippet {
+        padding:      20px;
+        margin-left:  80px;
+        margin-right: 80px;
+        border-style: solid;
+        border-width: 1px;
+        border-color: gray;
+        background:   #F8F8F8;
+      }
+      pre.tree {
+        font-size:   18px;
+        line-height: 100%;
+        color: gray;
+      }
+      pre.tree span.plain, pre.tree span.del, pre.tree span.new, pre.tree span.use, pre.tree span.note {
+        font-size: 14px;
+      }
+      pre.tree span.del, pre.tree span.new, pre.tree span.use  {
+        font-weight: bold
+      }
+      span.plain {color: black}
+      span.new   {color: SteelBlue}
+      span.del   {color: red}
+      span.use   {color: green}
+      span.note  {font-family: serif; font-style: italic}
+      span.string {color: DarkGoldenRod}
+
+      table.two-columns {
+        margin-left:  auto;
+        margin-right: auto;
+        border-style: solid;
+        border-width: 3px;
+        background: #F8F8F8;
+      }
+      table.two-columns tr {
+        vertical-align: top;
+      }
+      table.two-columns td {
+        padding-left:   20px;
+        padding-right: 130px;
+      }
+      table.two-columns th.next, table.two-columns td.next {
+        border-left: 3px solid;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Multiple Java modules in a single Gradle sub-project</h1>
+    <p>
+      Since the release of Java 9 and the Java Platform Module System (<abbr>JPMS</abbr>, code-named "Jigsaw"),
+      the tendency in Maven or Gradle projects is to either ignore JPMS,
+      or to consider Java modules as equivalent to Maven modules or Gradle sub-projects:
+      each Maven module contains exactly one Java module,
+      and the same convention is applied to Gradle sub-projects.
+      However this restriction is technically not necessary.
+      We could use a slightly more neutral interpretation of Maven module
+      by saying that each Maven module contains exactly one Java compilation task,
+      i.e. one call to <code>javac</code> or <code>javadoc</code>,
+      and leave out all <abbr title="Java Platform Module System">JPMS</abbr> considerations
+      (except during <abbr title="Java Archive File">JAR</abbr> packaging)
+      as Java tools internal business.
+    </p><p>
+      Since Java 9, the <code>javac</code> and <code>javadoc</code> tools can process many Java modules together.
+      Allowing that multiplicity in developer's project has some advantages described in this page.
+      To summarize, it gives to developers an extra level of flexibility for organizing their modules,
+      enables more compile-time checks of cross-module documentation,
+      facilitates aggregated javadoc and aggregated annotation processing,
+      facilitates the reuse of test fixtures between modules, and more.
+      However taking full advantage of <abbr title="Java Platform Module System">JPMS</abbr>
+      requires changes in the directory layout compared to Maven and Gradle conventions.
+      As of June 2023, both Maven and Gradle support only a directory layout known as <i>Package Hierarchy</i>.
+      However since Java 9, <code>javac</code> supports another layout known as <i>Module Source Hierarchy</i>
+      (source: <code>javac</code> <a href="https://docs.oracle.com/en/java/javase/20/docs/specs/man/javac.html#directory-hierarchies">Directory Hierarchies</a>).
+      This page describes how the Module Source Hierarchy can be applied to the <a href="https://sis.apache.org/">Apache SIS</a> project.
+      The layout described below is currently very difficult to apply with Maven,
+      so this page will provide code snippets for Gradle only.
+    </p>
+
+    <h2>1) Overview of directory layout change</h2>
+    <p>
+      Multiple Java modules in a single Gradle sub-project does not mean that Gradle sub-projects should be abandoned.
+      Instead, Java modules introduces one new level of sub-division between Gradle sub-projects and Java packages,
+      illustrated by the blue line below. Developers should be free to use it or not,
+      and to choose what to group as a Gradle sub-project and what to group as a Java module.
+    </p>
+    <ol>
+      <li>A Gradle project can be (if desired) a tree of Gradle sub-projects.</li>
+      <li><span class="new">Each Gradle leaf sub-project can contain many Java modules.</span></li>
+      <li>Each Java module can contain many Java packages.</li>
+    </ol>
+    <p>
+      Java provides some flexibility about the directory layout in a Module Source Hierarchy.
+      In this section, we assume that the developer wants to stay close to Maven conventions.
+      The <span class="use">names in green</span> are directories taken unchanged from Maven conventions
+      and <span class="new">names in blue</span> are new directories added for Module Source Hierarchy support.
+      The <span class="del">names in red</span> are directories from Maven conventions that we propose to drop,
+      but this is an arbitrary proposal for Apache <abbr title="Spatial Information System">SIS</abbr> restructuring
+      that does not need to be adopted (the <code>java</code> directory relevance is a separated debate).
+      In the figure below, the paths on the left side can become the paths on the right side,
+      where <span class="new"><var>&lt;module&gt;</var></span> shall be replaced by a
+      <abbr title="Java Platform Module System">JPMS</abbr> module name
+      such as <span class="new"><code>org.apache.sis.storage</code></span>.
+    </p>
+    <table class="two-columns">
+      <tr>
+        <th>Current Maven layout</th>
+        <th class="next">Module Source Hierarchy</th>
+      </tr>
+      <tr>
+        <td>
+          <ul>
+            <li><var>&lt;Gradle project or sub-project&gt;</var>
+              <ul>
+                <li><var>&lt;Gradle sub-project&gt;</var>
+                  <ul>
+                    <li><span class="use">src</span>/<span class="use">main</span>/<span class="del">java</span></li>
+                    <li><span class="use">src</span>/<span class="use">test</span>/<span class="del">java</span></li>
+                  </ul>
+                <li>Repeat for other Gradle sub-projects</li>
+              </ul>
+            </li>
+          </ul>
+        </td><td class="next">
+          <ul>
+            <li><var>&lt;Gradle project or sub-project&gt;</var>
+              <ul>
+                <li><span class="use">src</span>/<span class="new"><var>&lt;module&gt;</var></span>/<span class="use">main</span>/<span class="del">java</span></li>
+                <li><span class="use">src</span>/<span class="new"><var>&lt;module&gt;</var></span>/<span class="use">test</span>/<span class="del">java</span></li>
+                <li>Repeat for other <abbr title="Java Platform Module System">JPMS</abbr> modules</li>
+              </ul>
+            </li>
+            <li>Separated Gradle sub-projects are still possible if desired</li>
+          </ul>
+        </td>
+      </tr>
+    </table>
+    <p>
+      When compiling with <code>javac</code>, the root source directory shall be the <span class="use">src</span> directory containing all
+      modules rather than the <span class="del">java</span> directory containing the <code>org/apache/sis/…</code> hierarchy of packages.
+      The <span class="new"><var>&lt;module&gt;</var></span> directory names shall be identical to the module names declared in <code>module-info.java</code>.
+      An arbitrary amount of custom directories can be inserted between the <span class="new"><var>&lt;module&gt;</var></span> directory
+      and the start of the package directories (e.g. <code>org/apache/sis/…</code>).
+      This insertion of custom directories is the difference between <i>Module Hierarchy</i>
+      and <i>Module <u>Source</u> Hierarchy</i> in <code>javac</code> documentation.
+      The custom directories shall be declared with the <code>--module-source-path</code> option like below,
+      where the <code>*</code> character will be automatically replaced by
+      <span class="new"><var>&lt;module&gt;</var></span> by the <code>javac</code> compiler:
+    </p>
+    <blockquote><code>
+      javac <b>--module-source-path</b>=<var>/path/to/subproject</var>/<span class="use">src</span>/*/<span class="use">main</span>/<span class="del">java</span>
+    </code></blockquote>
+    <p>
+      The options for compiling the tests are similar with <span class="use">main</span> replaced by <span class="use">test</span>
+      (or anything else at user's choice) like below:
+    </p>
+    <blockquote><code>
+      javac <b>--module-source-path</b>=<var>/path/to/subproject</var>/<span class="use">src</span>/*/<span class="use">test</span>/<span class="del">java</span>
+    </code></blockquote>
+    <p>
+      Users are free to add other sub-directories, for example <span class="use"><code>resources</code></span>,
+      under the <span class="new"><var>&lt;module&gt;</var></span> directory.
+      Everything that do not match the pattern given to the <code>--module-source-path</code> option will be ignored.
+      So the main sources, the tests and the resources can be all located under the same module directory,
+      in a way close to Maven convention if desired.
+      How to apply those options in a Gradle project will be discussed <a href="#gradle-config">later on this page</a>.
+    </p>
+
+
+
+
+    <h2>2) Apache SIS restructuring</h2>
+    <p>
+      This section discusses a proposed restructuring of the <a href="https://sis.apache.org/">Apache SIS</a> project
+      following the Module Source Hierarchy. It can been seen as an example of one possible approach for distributing
+      modules between <abbr title="Java Platform Module System">JPMS</abbr> modules and Gradle sub-projects.
+      For more generic discussion about Gradle configuration, jump to the <a href="#gradle-config">next section</a>.
+    </p><p>
+
+      The tree on the left side shows the current directory layout as of May 2023, which follows Maven conventions.
+      The tree on the right side shows a new directory layout proposal.
+      The <span class="new">names in blue</span> are new directory levels.
+      The <span class="del">names in red</span> are removed directory levels.
+      The <span class="use">names in green</span> are directory levels kept unchanged.
+      The <span class="use">src</span>, <span class="use">main</span>,
+      <span class="use">test</span> and <span class="del">java</span>
+      directories are from Maven conventions.
+      The other changes shown below are a proposed restructuring of the
+      Apache <abbr title="Spatial Information System">SIS</abbr> project.
+      Resources are omitted in this discussion for simplicity.
+    </p>
+
+    <table class="two-columns">
+      <tr>
+        <th>Current Maven layout</th>
+        <th class="next">Module Source Hierarchy</th>
+      </tr>
+      <tr>
+        <td>
+          <pre class="tree"><span class="note">Apache SIS project root</span>
+├── <span class="plain">pom.xml</span>
+├── <span class="del">core</span>
+│   ├── <span class="plain">pom.xml</span>
+│   ├── <span class="del">sis-util</span>
+│   │   ├── <span class="plain">pom.xml</span>
+│   │   └── <span class="use">src</span>
+│   │       ├── <span class="use">main</span>
+│   │       │   └── <span class="del">java</span>
+│   │       │       └── <span class="plain">org/apache/sis/…</span>
+│   │       └── <span class="use">test</span>
+│   │           └── <span class="del">java</span>
+│   │               └── <span class="plain">org/apache/sis/…</span>
+│   ├── <span class="del">sis-metadata</span>
+│   │   └── <span class="note">Same structure, omitted for brevity.</span>
+│   ├── <span class="del">sis-referencing</span>
+│   ├── <span class="del">sis-referencing-by-identifiers</span>
+│   ├── <span class="del">sis-feature</span>
+│   ├── <span class="del">sis-cql</span>
+│   └── <span class="del">sis-portrayal</span>
+├── <span class="del">storage</span>
+│   ├── <span class="plain">pom.xml</span>
+│   ├── <span class="del">sis-storage</span>
+│   │   ├── <span class="plain">pom.xml</span>
+│   │   └── <span class="use">src</span>
+│   │       ├── <span class="use">main</span>
+│   │       │   └── <span class="del">java</span>
+│   │       │       └── <span class="plain">org/apache/sis/…</span>
+│   │       └── <span class="use">test</span>
+│   │           └── <span class="del">java</span>
+│   │               └── <span class="plain">org/apache/sis/…</span>
+│   ├── <span class="del">sis-shapefile</span>
+│   │   └── <span class="note">Same structure, omitted for brevity.</span>
+│   ├── <span class="del">sis-xmlstore</span>
+│   ├── <span class="del">sis-sqlstore</span>
+│   ├── <span class="del">sis-netcdf</span>
+│   ├── <span class="del">sis-geotiff</span>
+│   └── <span class="del">sis-earth-observation</span>
+├── <span class="del">cloud</span>
+│   ├── <span class="plain">pom.xml</span>
+│   └── <span class="del">sis-cloud-aws</span>
+├── <span class="del">profiles</span>
+│   ├── <span class="plain">pom.xml</span>
+│   ├── <span class="del">sis-france-profile</span>
+│   └── <span class="del">sis-japan-profile</span>
+└── <span class="del">application</span>
+    ├── <span class="plain">pom.xml</span>
+    ├── <span class="del">sis-console</span>
+    ├── <span class="del">sis-webapp</span>
+    ├── <span class="del">sis-openoffice</span>
+    └── <span class="del">sis-javafx</span></pre></td>
+
+
+        <td class="next">
+          <pre class="tree"><span class="note">Apache SIS project root</span>
+├── <span class="plain">settings.gradle.kts</span>
+├── <span class="new">endorsed</span>
+│   ├── <span class="plain">build.gradle.kts</span>
+│   └── <span class="use">src</span>
+│       ├── <span class="new">org.apache.sis.util</span>
+│       │   ├── <span class="use">main</span>
+│       │   │   ├── <span class="plain">module-info.java</span>
+│       │   │   └── <span class="plain">org/apache/sis/…</span>
+│       │   └── <span class="use">test</span>
+│       │       └── <span class="plain">org/apache/sis/…</span>
+│       ├── <span class="new">org.apache.sis.metadata</span>
+│       │   └── <span class="note">Same structure, omitted for brevity.</span>
+│       ├── <span class="new">org.apache.sis.referencing</span>
+│       ├── <span class="new">org.apache.sis.referencing.gazetteer</span>
+│       ├── <span class="new">org.apache.sis.feature</span>
+│       ├── <span class="new">org.apache.sis.storage</span>
+│       ├── <span class="new">org.apache.sis.storage.xml</span>
+│       ├── <span class="new">org.apache.sis.storage.sql</span>
+│       ├── <span class="new">org.apache.sis.storage.netcdf</span>
+│       ├── <span class="new">org.apache.sis.storage.geotiff</span>
+│       ├── <span class="new">org.apache.sis.storage.earthobservation</span>
+│       ├── <span class="new">org.apache.sis.cloud.aws</span>
+│       ├── <span class="new">org.apache.sis.portrayal</span>
+│       ├── <span class="new">org.apache.sis.profile.france</span>
+│       ├── <span class="new">org.apache.sis.profile.japan</span>
+│       ├── <span class="new">org.apache.sis.console</span>
+│       ├── <span class="new">org.apache.sis.openoffice</span>
+│       └── <span class="new">org.apache.sis.test</span> <span class="note">(new module, see below)</span>
+│           └── <span class="use">test</span>
+│               └── <span class="plain">module-info.java</span>
+├── <span class="new">incubator</span>
+│   ├── <span class="plain">build.gradle.kts</span>
+│   └── <span class="use">src</span>
+│       ├── <span class="new">org.apache.sis.cql</span>
+│       │   ├── <span class="use">main</span>
+│       │   │   ├── <span class="plain">module-info.java</span>
+│       │   │   └── <span class="plain">org/apache/sis/…</span>
+│       │   └── <span class="use">test</span>
+│       │       └── <span class="plain">org/apache/sis/…</span>
+│       ├── <span class="new">org.apache.sis.storage.shapefile</span>
+│       │   └── <span class="note">Same structure, omitted for brevity.</span>
+│       └── <span class="new">org.apache.sis.webapp</span>
+└── <span class="new">optional</span>
+    ├── <span class="plain">build.gradle.kts</span>
+    └── <span class="use">src</span>
+        └── <span class="new">org.apache.sis.gui</span>
+            └── <span class="note">Same structure, omitted for brevity.</span></pre>
+        </td>
+      </tr>
+    </table>
+    <p>
+      In the old layout (left side),
+      the Apache <abbr title="Spatial Information System">SIS</abbr> project organized modules in some groups:
+      <i>core</i>, <i>storage</i>, <i>cloud</i>, <i>profiles</i> and <i>application</i>.
+      While this grouping can be useful for understanding the content
+      of the Apache <abbr title="Spatial Information System">SIS</abbr> project,
+      it serves no purpose from the point of view of build management.
+      In the new layout (right side), that grouping is removed from the directory tree.
+      Such logical grouping can appear in <abbr title="Java Platform Module System">JPMS</abbr>
+      module names if desired, for example <code>org.apache.sis.<b>storage</b>.*</code>,
+       <code>org.apache.sis.<b>cloud</b>.*</code> and <code>org.apache.sis.<b>profile</b>.*</code>.
+      The old "build-irrelevant" grouping is replaced by a new grouping which is relevant to the build:
+    </p>
+    <ul>
+      <li>The <b>endorsed</b> sub-project contains all modules that are included in
+          official Apache <abbr title="Spatial Information System">SIS</abbr> releases.</li>
+      <li>The <b>incubator</b> sub-project contains modules that are not yet ready for release.</li>
+      <li>The <b>optional</b> sub-project contains modules requiring agreement with license terms
+          more restrictive than Apache 2.</li>
+    </ul>
+    <p>
+      With the new layout, modules that are not ready for release can be easily excluded all together.
+      By comparison, with the old layout the release manager had to manually exclude various modules
+      scattered in the tree.
+      Likewise, the optional modules can be included or excluded all together depending on license agreement.
+      For example the <abbr title="Graphical User Interface">GUI</abbr> depends on JavaFX and can be included
+      in the build only on acceptance of <abbr title="GNU General Public License">GPL</abbr> terms.
+      This new way of grouping modules will hopefully simplify
+      Apache <abbr title="Spatial Information System">SIS</abbr> releases.
+    </p>
+    <h3>2.1) Consequence on cross-module dependencies</h3>
+    <p>
+      In the new layout, the replacement of Maven modules by <abbr title="Java Platform Module System">JPMS</abbr>
+      modules has a desirable side-effect.
+      In the old layout, any Maven module could depend on any other Maven module as long as there is no cycle.
+      Maven determines the modules build order regardless if modules belong to the same groups or not.
+      So nothing (except cycles) prevented a module in the <span class="del">core</span> group to depend
+      on a module in incubation or subject to restrictive license terms.
+      With the new layout, the <span class="new">endorsed</span>, <span class="new">incubator</span> and
+      <span class="new">optional</span> sub-projects are the finest level of grouping managed by the build system.
+      The <abbr title="Java Platform Module System">JPMS</abbr> modules inside those sub-projects cannot be managed
+      independently by the build system, which has advantages and inconvenient.
+      An advantage for Apache <abbr title="Spatial Information System">SIS</abbr> is that compile-time dependency of
+      <span class="new">endorsed</span> modules toward any <span class="new">incubator</span> or
+      <span class="new">optional</span> modules become impossible
+      (however, runtime dependency through Service Provider Interfaces is still possible).
+    </p>
+    <h3>2.2) Dropping the separation between source and resources</h3>
+    <p>
+      For the Apache <abbr title="Spatial Information System">SIS</abbr> restructuring,
+      we propose to drop the <span class="del">java</span> directory.
+      The consequence would be that resources are no longer separated from Java source code.
+      The Maven's convention putting resources in a separated directory hierarchy
+      is considered a good practice by some, but this is not an universal opinion.
+      NetBeans Ant projects and OpenJDK for example don't do that.
+      The argument is similar to documentation, which was traditionally separated from the code in previous programming languages.
+      The Java designers decided that the best place to put documentation (javadoc) was close to the code.
+      Having resources close to the code has similar advantages.
+      It makes more likely that the developer sees when a change in a class may require a change in a resource,
+      and less tedious to open that file (no need to navigate through the exact same path in a separated directory hierarchy).
+      Furthermore, the Maven's convention separating <span class="del">java</span> and <span class="del">resources</span>
+      does not work well in a multi-languages project anyway, because it does not distinguish
+      the Java resources to copy in a <abbr title="Java Archive File">JAR</abbr> file
+      from the C/C++ or Python resources (for example).
+      Mixing two languages in the same module happens when the module is a bridge between those two languages,
+      such as <a href="https://github.com/OSGeo/PROJ-JNI">PROJ-JNI</a> (between Java and C/C++)
+      and <a href="http://www.geoapi.org/java-python/index.html">GeoAPI bridge</a> (between Java and Python).
+    </p>
+    <h3>2.3) Test module</h3>
+    <p>
+      The new layout contains a module, named <span class="new"><code>org.apache.sis.test</code></span>,
+      that did not existed in the old layout. This module is local to the build and never deployed.
+      It has no <code><span class="use">main</span></code> sub-directory,
+      only a <code><span class="use">test</span>/module-info.java</code> file.
+      This is a convenient way to declare dependencies that are needed by the tests
+      but not declared in any <code><span class="use">main</span>/module-info.java</code> file being compiled.
+      Actually our experiments suggest that the <code>--add-reads</code> option does not work well if the added
+      module does not appear in a <code>requires</code> clause of at least one <code>module-info.java</code> file.
+      The <span class="new"><code>org.apache.sis.test</code></span> module resolves that problem.
+    </p><p>
+      Maven has a different approach which allows the tests to overwrite the main <code>module-info</code> files.
+      We don't do that because those files are sometime a bit large,
+      and we want to avoid the risk of overwriting them with
+      <code><span class="use">test</span>/module-info.java</code> files that differ in unintended ways.
+      In our proposed approach, the <span class="new"><code>org.apache.sis.test</code></span> module information
+      is added to the <code>module-info</code> files of all modules to test instead of overwriting them.
+    </p>
+
+
+
+
+    <h2 id="gradle-config">3) Gradle configuration for Module Source Hierarchy</h2>
+    <p>
+      It is possible to get Gradle to work to some extent without writing a custom plugin.
+      The hacks are not very clean, but could be much better with a little bit of improvement from Gradle.
+      The "<a href="#gradle-proposals">Ideas for Gradle evolution</a>" section provides some proposals.
+      For now, the configuration in a <code>build.gradle.kts</code> file for Gradle 8.1 can be as below.
+      The example on the left side uses hard-coded Apache <abbr title="Spatial Information System">SIS</abbr> module names.
+      The example on the right side is slightly more generic
+      and shows what the script can look like if we move some script code to a Gradle plugin in Java.
+    </p>
+    <table class="two-columns">
+      <tr>
+        <th>Standalone Gradle script (no custom plugin)</th>
+        <th class="next">Gradle script with a custom plugin</th>
+      </tr>
+      <tr>
+        <td><pre>plugins {
+    `java-library`
+}
+
+sourceSets {
+    main {
+        java {
+            setSrcDirs(listOf(file(<span class="string">"<span class="use">src</span>/<span class="new">org.apache.sis.util</span>/<span class="use">main</span>/<span class="del">java</span></span>),
+                              file(<span class="string">"<span class="use">src</span>/<span class="new">org.apache.sis.metadata</span>/<span class="use">main</span>/<span class="del">java</span></span>),
+                              file(<span class="string">"<span class="use">src</span>/<span class="new">org.apache.sis.referencing</span>/<span class="use">main</span>/<span class="del">java</span></span>),
+                              <span class="note">/* etc. We will use a plugin in Java for automation. /*</span> )
+        }
+    }
+    test {
+        java {
+            setSrcDirs(listOf(file(<span class="string">"<span class="use">src</span>/<span class="new">org.apache.sis.util</span>/<span class="use">test</span>/<span class="del">java</span></span>),
+                              file(<span class="string">"<span class="use">src</span>/<span class="new">org.apache.sis.metadata</span>/<span class="use">test</span>/<span class="del">java</span></span>),
+                              file(<span class="string">"<span class="use">src</span>/<span class="new">org.apache.sis.referencing</span>/<span class="use">test</span>/<span class="del">java</span></span>),
+                              <span class="note">/* etc. We will use a plugin in Java for automation. /*</span> )
+        }
+    }
+}
+
+tasks.compileJava {
+    options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">src</span>/<span class="new">*</span>/<span class="use">main</span>/<span class="del">java</span>"</span>)
+    options.compilerArgs.add(<span class="string">"--module-path=${classpath.asPath}"</span>)
+    setClasspath(files())   <span class="note">// For avoiding duplication with the <code>--module-path</code> option.</span>
+}
+
+tasks.compileTestJava {
+    options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">src</span>/<span class="new">*</span>/<span class="use">test</span>/<span class="del">java</span>"</span>)
+    options.compilerArgs.add(<span class="string">"--module-path=${classpath.asPath}"</span>)
+    setClasspath(files())
+    file("<span class="use">src</span>").list().forEach {
+        options.compilerArgs.add(<span class="string">"--patch-module"</span>)
+        options.compilerArgs.add(<span class="string">"${it}=<span class="use">src</span>/${it}/<span class="use">test</span>/<span class="del">java</span>"</span>)
+    }
+}</pre></td>
+<td class="next"><pre>plugins {
+    `java-library`
+    id("org.apache.sis.buildtools")
+}
+
+/*
+ * Same script than on the left side, but with the following code removed:
+ *
+ *  - The full `sourceSets` block.
+ *  - The class-path and module-path settings.
+ *
+ * Those fragments are moved to a Java code shown later.
+ */
+
+tasks.compileJava {
+    options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">src</span>/<span class="new">*</span>/<span class="use">main</span>/<span class="del">java</span>"</span>)
+}
+
+tasks.compileTestJava {
+    options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">src</span>/<span class="new">*</span>/<span class="use">test</span>/<span class="del">java</span>"</span>)
+    file("<span class="use">src</span>").list().forEach {
+        options.compilerArgs.add(<span class="string">"--patch-module"</span>)
+        options.compilerArgs.add(<span class="string">"${it}=<span class="use">src</span>/${it}/<span class="use">test</span>/<span class="del">java</span>"</span>)
+    }
+}</pre></td>
+      </tr>
+    </table>
+
+    <p>
+      The script on the left side can be simplified by writing a Gradle plugin in Java. Details about how to do so are given
+      in the <a href="https://docs.gradle.org/current/userguide/implementing_gradle_plugins.html">Gradle documentation</a>
+      and are not repeated here. Some parts that can be moved from <code>build.gradle.kts</code> script to Java code
+      are the full <code>sourceSets</code> configuration, together with the class-path and module-path settings.
+      The code moved to the Java code can be reused by many Gradle sub-projects,
+      contrarily to the scripts which need to be repeated in each <code>build.gradle.kts</code> file.
+      The Java code in the Gradle plugin can contain the following methods:
+    </p>
+
+    <pre class="snippet">public class Modularization implements Plugin&lt;Project&gt; {
+    @Override
+    public void <b>apply</b>(Project project) {
+        project.getPluginManager().apply(JavaPlugin.class);     <span class="note">// This plugin depends on the Java plugin.</span>
+        <b>setSourceModulePaths</b>(project);
+        TaskContainer tasks = project.getTasks();
+        tasks.withType(JavaCompile.class).forEach((task) -> {
+            task.doFirst(Modularization::<b>setDependencyModulePath</b>);
+        });
+    }
+
+    /*
+     * <span class="note">This method replaces the <code>sourceSets</code> block in the <code>build.gradle.kts</code> file.</span>
+     */
+    private static void <b>setSourceModulePaths</b>(Project project) {
+        SourceSetContainer sources = project.getExtensions().getByType(SourceSetContainer.class);
+        SourceSet          main    = sources.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
+        SourceSet          test    = sources.getByName(SourceSet.TEST_SOURCE_SET_NAME);
+        File[]             modules = project.file(<span class="use">"src"</span>).listFiles(File::isDirectory);
+        if (modules == null) {
+            throw new IllegalArgumentException("Not a directory: src");
+        }
+        File[] mainDirs = new File[modules.length];
+        File[] testDirs = new File[modules.length];
+        for (int i=0; i&lt;modules.length; i++) {
+            mainDirs[i] = new File(modules[i], "<span class="use">main</span>/<span class="del">java</span>");
+            testDirs[i] = new File(modules[i], "<span class="use">test</span>/<span class="del">java</span>");
+        }
+        main.getJava().setSrcDirs(Arrays.asList(mainDirs));
+        test.getJava().setSrcDirs(Arrays.asList(testDirs));
+    }
+
+    /*
+     * <span class="note">This method replaces the following lines from the <code>build.gradle.kts</code> file.</span>
+     *
+     * options.compilerArgs.add(<span class="string">"--module-path=${classpath.asPath}"</span>)
+     * setClasspath(files())
+     */
+    private static void <b>setDependencyModulePath</b>(Task task) {
+        JavaCompile    compile = (JavaCompile) task;
+        Project        project = compile.getProject();
+        CompileOptions options = compile.getOptions();
+        List&lt;String&gt; args = options.getCompilerArgs();
+        args.add(<span class="string">"--module-path"</span>);
+        args.add(compile.getClasspath().getAsPath());
+        compile.setClasspath(project.files());          <span class="note">// For avoiding duplication with the --module-path option.</span>
+    }
+}</pre>
+
+    <h3>3.1) Gradle issues and workarounds</h3>
+    <p>
+      Above configuration works but has the following problems with Gradle 8.1.
+      Workarounds for current Gradle version are presented in this section.
+      Proposed Gradle evolutions are proposed in a <a href="#gradle-proposals">later section</a>.
+    </p>
+    <h4>3.1.1) Automatic dispatching between class-path and module-path does not work</h4>
+    <p>
+      The <code>--module-path</code> option provided by ourselves in above script
+      duplicates fully the <code>--class-path</code> option provided by Gradle.
+      We avoid collision by resetting the class-path to an empty set of files,
+      with a call to <code>setClasspath(…)</code> which overwrites the Gradle settings.
+      But this hack puts everything on the module-path, including non-modular dependencies.
+      In practice it seems to work anyway, but it would be cleaner if we could dispatch dependencies
+      between the class-path and module-path according wether each dependency is a module or not.
+      In theory such dispatching is done automatically by Gradle,
+      so we should not need to provide the <code>--module-path</code> option at all.
+      However this automatic dispatching is enabled only if Gradle believes that the sub-project
+      being compiled is itself a <abbr title="Java Platform Module System">JPMS</abbr> module,
+      and Gradle does not recognize above configuration as such. The Gradle's
+      <a href="https://docs.gradle.org/8.1/javadoc/org/gradle/api/jvm/ModularitySpec.html"><code>ModularitySpec</code></a>
+      class does not provide an option for forcing the activation of automatic dispatching.
+      Our current workaround is to do nothing.
+      This is not clean, but <code>javac</code> seems to work anyway with everything on the module path.
+    </p>
+    <h4>3.1.2) Repeated module path</h4>
+    <p>
+      Adding the <code>--module-path</code> in the compiler options cause the option to appear twice
+      in the debug output of Gradle 8.1. The two occurrences have the exact same path, which may be large.
+      We found no way to prevent that duplication, as it does not appear in the list returned by
+      <a href="https://docs.gradle.org/8.1/javadoc/org/gradle/api/tasks/compile/CompileOptions.html#getCompilerArgs--"><code>CompilerOptions.getCompilerArgs()</code></a>.
+      Our current workaround is to do nothing,
+      as <code>javac</code> seems to work anyway with duplicated elements on the module path.
+    </p>
+    <h4>3.1.3) Source path incompatibility</h4>
+    <p>
+      In the same way that <code>--class-path</code> and <code>--module-path</code> should specify mutually exclusive sets,
+      <code>--source-path</code> and <code>--module-source-path</code> should also be mutually exclusive options.
+      The <code>--source-path</code> option is considered rarely needed in modern builds and can be omitted.
+      But the Gradle's debug output seems to unconditionally provide the latter option at least with an empty string,
+      because the empty string has a different meaning than the default <code>javac</code> value.
+      Using the Gradle <abbr>API</abbr> for setting the source path to <code>null</code> does not help since Gradle
+      <a href="https://docs.gradle.org/8.1/javadoc/org/gradle/api/tasks/compile/CompileOptions.html#getSourcepath--">interprets that as an empty path</a>.
+      We saw no <abbr>API</abbr> for telling Gradle to omit completely that option.
+      This is a problem since the <code>--module-source-path</code> option is necessary for specifying the
+      <code><span class="use">src</span>/<span class="new">*</span>/<span class="use">main</span>/<span class="del">java</span></code> pattern.
+      Consequently when launching <code>javac</code> on the command-line with the options shown by Gradle's debug output,
+      we get the following error:
+    </p>
+    <blockquote><code>error: cannot specify both --source-path and --module-source-path</code></blockquote>
+    <p>
+      Our current workaround is to do nothing.
+      The Java compiler seems to work inside Gradle, even if it doesn't work on the command-line with Gradle's debug output.
+    </p>
+
+
+
+
+    <h2>4) Advantages of Source Module Hierarchy</h2>
+    <p>
+      The use of <i>Module Source Hierarchy</i> instead of <i>Package Hierarchy</i> has advantages and inconvenient.
+      Advantages for the Apache <abbr title="Spatial Information System">SIS</abbr> project are described below.
+      The main inconvenient is the poor support in current build tools and
+      <abbr title="Integrated Development Environment">IDE</abbr>.
+      However the latter is not a blocker, and we can try to contribute in improving the situation with proposals
+      such as the "<a href="#gradle-proposals">Ideas for Gradle evolution</a>" section at the bottom of this page.
+    </p>
+    <h3>4.1) Aggregated output generation without resorting to hacks</h3>
+    <p>
+      Most JDK tools are <abbr title="Java Platform Module System">JPMS</abbr> aware
+      and can process many modules in one invocation of each command-line tool.
+      In some cases, the same result can be obtained by invoking the same tool repetitively for each module, but not always.
+      The most obvious example where the result differs is <code>javadoc</code>.
+      When executed for a group of modules instead of invoked repetitively for each module,
+      <code>javadoc</code> can generate an aggregated <abbr title="Application Programming Interface">API</abbr> documentation
+      with a home page listing all modules, an index with entries from all modules,
+      hyper-links to modules beyond the boundary of what is declared in <code>module-info</code>
+      (for example lists of all implementations of each interface), <i>etc.</i>
+      Such aggregation does not fit naturally in the Maven directory layout.
+      Maven does support aggregated Javadoc, but this support requires hacks and may not be easily applicable to other tools.
+      An example of another tool for which aggregated execution is sometime useful is annotation processor.
+      More use cases may appear in future Java versions (e.g. multi-modules archive files?).
+      A native support of Module Source Hierarchy in Gradle would make easier to leverage those features
+      with less needs to resort to hacks.
+    </p>
+    <h3>4.2) Compile-time verification of Javadoc links</h3>
+    <p>
+      Suppose that module <var>B</var> depends on module <var>A</var>.
+      Module <var>B</var> can have compile-time dependencies toward <var>A</var> (backward references),
+      but the converse (a forward reference from <var>A</var> to <var>B</var>) is illegal for the compiler.
+      However such forward references are perfectly legal in <em>documentation</em>,
+      and indeed the <code>javadoc</code> tool handles them well.
+      It is possible to write Javadoc <code>{@link}</code> and <code>{@see}</code> tags in module <var>A</var> with
+      forward references to some <abbr title="Application Programming Interface">API</abbr> in module <var>B</var>.
+      However doing so with Maven directory layout requires that we sacrifice a safety.
+      The <code>javac</code> tool offers the possibility to verify Javadoc <code>{@link}</code> and <code>{@see}</code>
+      tags at compile-time. This feature offers much faster error detections than waiting for Javadoc generation,
+      because the latter is done less frequently than compilation.
+      This verification can be enabled by passing the <code>-Xdoclint:all</code> option to <code>javac</code>,
+      in which case any invalid <code>{@link}</code> or <code>{@see}</code> tag causes a compilation error.
+      It works well with references to <abbr title="Application Programming Interface">API</abbr> in the same module
+      or in dependencies, but cannot work with forward references unless <code>javac</code> knows that those modules
+      exist and what they contain.
+      This is possible with Module Source Hierarchy, but not with Maven directory layout.
+      With the latter, all forward references are flagged as errors.
+      With the former, compile-time verification of <code>{@link}</code> or <code>{@see}</code> tags,
+      including forward references, works like a charm.
+    </p>
+    <h3>4.3) Easier reuse of test fixtures</h3>
+    <p>
+      The test code for a module may create test fixtures, mocks or assertion methods
+      that we want to reuse in the test code of dependent modules.
+      With Maven, we have to package the test classes in an artifact of type <code>test-jar</code>.
+      With the module source hierarchy, this is no longer necessary if the test fixtures are reused
+      only inside the same sub-project. For example if test fixtures are provided in the
+      <code>org.apache.sis.test</code> package under the
+      <code><span class="use">test</span>/<span class="del">java</span></code>
+      sub-directory of the <code>org.apache.sis.util</code> module,
+      then all other modules in the same sub-project can access those text fixture by adding
+      the following script in the <code>build.gradle.kts</code> file,
+      with nothing to package or deploy:
+    </p>
+    <pre class="snippet">tasks.compileTestJava {
+    <span class="note">(…snip…)</span>
+
+    var <var>allModules</var> = file("<span class="use">src</span>").list().joinToString(separator=<span class="string">","</span>)
+    args.add(<span class="string">"--add-exports"</span>)
+    args.add(<span class="string">"org.apache.sis.util/org.apache.sis.test=${<var>allModules</var>}"</span>)
+}</pre>
+
+    <h3>4.4) Control on test environment</h3>
+    <p>
+      A side-effect of the proposal described in this page is that the tests of all modules in a Gradle sub-project
+      are executed together in the same <abbr title="Java Virtual Machine">JVM</abbr>.
+      It may be considered against unit test principles, but actually this is controllable.
+      First we note that having all modules in the <abbr title="Java Virtual Machine">JVM</abbr>
+      during test execution is not necessarily a bad thing.
+      It sometime happens that a test behaves differently when the module is alone in the <abbr>JVM</abbr>
+      compared to when all modules are present.
+      Because the latter scenario is more representative of production environment than the former,
+      some bugs were unnoticed because of that.
+      Some peoples will argue that integration tests should have discovered the issue,
+      but it is hard to have an extensive coverage for all kinds of tests.
+      With the Module Source Hierarchy, the easiest configuration it to let all tests
+      be executed in the same <abbr title="Java Virtual Machine">JVM</abbr>.
+      However we think that it should be possible to filter which modules to load in the <abbr>JVM</abbr>.
+      It could be a configuration option in Gradle for running the same tests with different sets of modules.
+    </p>
+
+    <h2>5) Conclusion</h2>
+    <p>
+      Maven and Gradle uses "convention-over-configuration" approach to build <abbr>JVM</abbr>-based project.
+      A problem with that approach is that it works well for a few years,
+      but when the convention become no longer suited to the language evolution,
+      it is very difficult to changes the habits.
+      I suspect that Maven conventions are a reason for the slow <abbr title="Java Platform Module System">JPMS</abbr> adoption.
+    </p>
+    <h3 id="gradle-proposals">5.1) Ideas for Gradle evolution</h3>
+    <p>
+      Full <abbr title="Java Platform Module System">JPMS</abbr> support,
+      i.e. having the possibility to use the <code>javac</code> <i>Module Source Hierarchy</i> when desired
+      instead of being restricted to the <i>Package Hierarchy</i>, has some advantages described in this page.
+      There is also inconvenient, but the intend is not to force developers to use Source Module Hierarchy.
+      The intend is to make easy to use either the package or source module hierarchy when desired.
+      Gradle could help in different ways, described below.
+    </p>
+    <h4>5.1.1) Explicit control over "class-path versus module-path" detection</h4>
+    <p>
+      Complete or replace the <code>inferModulePath</code> property in
+      <a href="https://docs.gradle.org/8.1/javadoc/org/gradle/api/jvm/ModularitySpec.html"><code>ModularitySpec</code></a>
+      for making possible to force the automatic dispatching of dependencies between class-path and module-path,
+      without relying on the conditions documented in the <code>getInferModulePath()</code> method.
+      This enhancement may not be needed if Gradle decides to support Source Module Hierarchy itself,
+      but it may by nice to have for the reasons given in section about
+      <a href="#javac-options">full control over compiler options</a>.
+    </p>
+    <h4 id="javac-options">5.1.2) Full control over all Java compiler options</h4>
+    <p>
+      Provide a way to set the all compiler options, including the ones managed by Gradle itself.
+      Currently the <a href="https://docs.gradle.org/8.1/javadoc/org/gradle/api/tasks/compile/CompileOptions.html"><code>CompilerOptions</code></a>
+      class has a <code>getCompilerArgs()</code> method providing a mutable list,
+      but that list is only for <em>additional</em> options appended after the options managed by Gradle.
+      There is also a <code>get<u>All</u>CompilerArgs()</code> method, but that list is immutable.
+      The reason why full control on all compiler options is sometime desired
+      is because latest Java releases may have new features that are incompatible with the options managed by Gradle.
+      Example of incompatible new Java compiler options are <code>-release</code> and <code>--module-source-path</code>.
+      The former is supported by Gradle 8.1, but not the latter. Even if Gradle resolves this incompatibility,
+      we can not know in advance what would be the next incompatible options in future Java releases.
+      We may also want to do cleanups such as removing the <code>--module-path</code> duplication.
+    </p>
+  </body>
+</html>
