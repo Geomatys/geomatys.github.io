@@ -712,6 +712,15 @@ tasks.compileTestJava {
       However we think that it should be possible to filter which modules to load in the <abbr>JVM</abbr>.
       It could be a configuration option in Gradle for running the same tests with different sets of modules.
     </p>
+    <h3>4.5) Speed</h3>
+    <p>
+      We have not done yet serious benchmarks, but compiling all modules from scratch seems a little bit faster when
+      <code>javac</code> is invoked once for all modules compared to invoking <code>javac</code> for each module.
+      Likewise, tests are also faster presumably because common dependencies are loaded only once and the caching
+      mechanisms of the tested application takes effect
+      (see the previous section for a discussion about running the tests of all modules together).
+      However, speed is not the main criterion regarding the use (or not) of Module Source Hierarchy.
+    </p>
 
     <h2>5) Conclusion</h2>
     <p>
@@ -753,6 +762,14 @@ tasks.compileTestJava {
       The former is supported by Gradle 8.1, but not the latter. Even if Gradle resolves this incompatibility,
       we can not know in advance what would be the next incompatible options in future Java releases.
       We may also want to do cleanups such as removing the <code>--module-path</code> duplication.
+    </p>
+    <h4>5.1.3) Allow to specify the test classes as a list of <code>java.lang.Class</code> objects</h4>
+    <p>
+      The test classes are currently specified as a list of files.
+      Gradle infers the class name from the file name, then invoke <code>Class.forName(String, ClassLoader)</code>.
+      But the class name inferred by Gradle is wrong when the project layout is not as expected by Gradle.
+      Other reasons why developers way want to instantiate the <code>Class</code> themselves may be if they need
+      some control on the <code>ClassLoader</code> or <code>ModuleLayer</code> to use for loading the classes.
     </p>
   </body>
 </html>
