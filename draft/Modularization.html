@@ -428,21 +428,52 @@
       It is possible to get Gradle to work to some extent without writing a custom plugin.
       The hacks are not very clean, but could be much better with a little bit of improvement from Gradle.
       The "<a href="#gradle-proposals">Ideas for Gradle evolution</a>" section provides some proposals.
-      For now, the configuration in a <code>build.gradle.kts</code> file for Gradle 8.1 can be as below.
-      The example on the left side uses hard-coded Apache <abbr title="Spatial Information System">SIS</abbr> module names.
-      The example on the right side is slightly more generic
-      and shows what the script can look like if we move some script code to a Gradle plugin in Java.
+      The key information that needs to be supplied are:
     </p>
-    <table class="two-columns">
-      <tr>
-        <th>Standalone Gradle script (no custom plugin)</th>
-        <th class="next">Gradle script with a custom plugin</th>
-      </tr>
-      <tr>
-        <td><pre>plugins {
+    <ul>
+      <li>For compiling the main code:
+        <ul>
+          <li><code><b>--module-path</b></code> <var>&lt;paths to all dependencies&gt;</var></li>
+          <li><code><b>--module-source-path</b> /<var>path_to_sub_project</var>/<span class="use">src</span>/*/<span class="use">main</span>/<span class="del">java</span></code></li>
+          <li><code><b>--add-modules</b> <var>module_1</var>,<var>module_2</var>,<var>module_3</var>,</code>…
+              (list all modules of the project, not dependencies)</li>
+        </ul>
+      </li>
+      <li>For compiling the test code:
+        <ul>
+          <li><code><b>--module-path</b></code> <var>&lt;paths to dependencies including the directory containing the output of above compilation of main modules&gt;</var></li>
+          <li><code><b>--module-source-path</b> /<var>path_to_sub_project</var>/<span class="use">src</span>/*/<span class="use">test</span>/<span class="del">java</span></code></li>
+          <li><code><b>--patch-module</b> <var>module_1</var>=<var>/path_to_sub_project</var>/<span class="use">src</span>/<var>module_1</var>/<span class="use">test</span>/<span class="del">java</span></code>
+              (repeat for each module)</li>
+          <li><code><b>--add-modules</b></code> <var>&lt;same as for compilation of main code&gt;</var></li>
+          <li><code><b>--add-reads</b> <var>module_1</var>=<var>dependency_A</var>,<var>dependency_B</var>,</code>… for all test-only dependencies such as JUnit
+              (repeat for each module)</li>
+        </ul>
+      </li>
+      <li>For executing the test code:
+        <ul>
+          <li><code><b>--module-path</b></code> <var>&lt;paths to dependencies and compilation result of main modules, but <strong>excluding compilation result of test classes</strong>&gt;</var></li>
+          <li><code><b>--patch-module</b> <var>module_1</var>=<var>${buildDir}</var>/classes/java/test/<var>module_1</var></code>
+              (repeat for each module)</li>
+          <li><code><b>--add-modules</b></code> <var>&lt;same as for compilation of main code&gt;</var></li>
+          <li><code><b>--add-reads</b></code> (as needed for test-only dependencies)</li>
+          <li><code><b>--add-opens</b></code> (as needed for Jakarta or other libraries based on reflection)</li>
+          <li><code><b>--add-exports</b></code> (as needed for allowing JUnit to test private package)</li>
+        </ul>
+      </li>
+    </ul>
+    <p>
+      A lot of configuration can be done automatically with loops.
+      The example below shows a small fragment of what a <code>build.gradle.kts</code> file
+      may look like when there is no plugin for making the task easier.
+      This example uses hard-coded Apache <abbr title="Spatial Information System">SIS</abbr> module names,
+      but the principle is generalizable to other projects.
+    </p>
+    <pre class="snippet">plugins {
     `java-library`
 }
 
+var srcDir = file("<span class="use">src</span>")     // Root directory of all modules.
 sourceSets {
     main {
         java {
@@ -462,111 +493,72 @@ sourceSets {
     }
 }
 
+fun addAllModules(args : List&lt;String&gt;) {
+    args.add(<span class="string">"--add-modules"</span>)
+    args.add(srcDir.list().joinToString(separator=","))
+}
+
 tasks.compileJava {
     options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">src</span>/<span class="new">*</span>/<span class="use">main</span>/<span class="del">java</span>"</span>)
     options.compilerArgs.add(<span class="string">"--module-path=${classpath.asPath}"</span>)
     setClasspath(files())   <span class="note">// For avoiding duplication with the <code>--module-path</code> option.</span>
+    addAllModules(options.compilerArgs)
 }
 
 tasks.compileTestJava {
     options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">src</span>/<span class="new">*</span>/<span class="use">test</span>/<span class="del">java</span>"</span>)
     options.compilerArgs.add(<span class="string">"--module-path=${classpath.asPath}"</span>)
     setClasspath(files())
-    file("<span class="use">src</span>").list().forEach {
+    srcDir.list().forEach {
         options.compilerArgs.add(<span class="string">"--patch-module"</span>)
         options.compilerArgs.add(<span class="string">"${it}=<span class="use">src</span>/${it}/<span class="use">test</span>/<span class="del">java</span>"</span>)
+        options.compilerArgs.add(<span class="string">"--add-reads"</span>)
+        options.compilerArgs.add(<span class="string">"${it}=org.apache.sis.test,junit"</span>)
     }
-}</pre></td>
-<td class="next"><pre>plugins {
-    `java-library`
-    id("org.apache.sis.buildtools")
+    addAllModules(options.compilerArgs)
+    <span class="note">// Add more <code>--add-reads</code> and <code>--add-exports</code> project-specific options as needed.</span>
 }
 
-/*
- * Same script than on the left side, but with the following code removed:
- *
- *  - The full `sourceSets` block.
- *  - The class-path and module-path settings.
- *
- * Those fragments are moved to a Java code shown later.
- */
-
-tasks.compileJava {
-    options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">src</span>/<span class="new">*</span>/<span class="use">main</span>/<span class="del">java</span>"</span>)
-}
-
-tasks.compileTestJava {
-    options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">src</span>/<span class="new">*</span>/<span class="use">test</span>/<span class="del">java</span>"</span>)
-    file("<span class="use">src</span>").list().forEach {
-        options.compilerArgs.add(<span class="string">"--patch-module"</span>)
-        options.compilerArgs.add(<span class="string">"${it}=<span class="use">src</span>/${it}/<span class="use">test</span>/<span class="del">java</span>"</span>)
+tasks.test {
+    useJUnitPlatform()
+    /*
+     * Create a module path which excludes the compiled test classes, because those
+     * classes will be specified using another JVM option (namely `--patch-module`).
+     */
+    val mainpath = classpath.filter {
+        path : File ->
+        !path.getName().equals(<span class="use">test</span>)
     }
-}</pre></td>
-      </tr>
-    </table>
+    val args = mutableListOf(<span class="string">"--module-path"</span>, mainpath.asPath)
+    srcDir.list().forEach {
+        args.add(<span class="string">"--patch-module"</span>)
+        args.add(<span class="string">"${it}=${buildDir}/classes/java/<span class="use">test</span>/${it}"</span>)
+        args.add(<span class="string">"--add-reads"</span>)
+        args.add(<span class="string">"${it}=junit,ALL-UNNAMED"</span>)
+    }
+    addAllModules(args)
+    <span class="note">// Add more <code>--add-reads</code> and <code>--add-exports</code> project-specific options as needed.</span>
+    setAllJvmArgs(args)
+}</pre>
 
     <p>
-      The script on the left side can be simplified by writing a Gradle plugin in Java. Details about how to do so are given
-      in the <a href="https://docs.gradle.org/current/userguide/implementing_gradle_plugins.html">Gradle documentation</a>
+      This complexity can be handled by a customized Gradle plugin in Java. Details about how to do so are given in the
+      <a href="https://docs.gradle.org/current/userguide/implementing_gradle_plugins.html">Gradle documentation</a>
       and are not repeated here. Some parts that can be moved from <code>build.gradle.kts</code> script to Java code
-      are the full <code>sourceSets</code> configuration, together with the class-path and module-path settings.
-      The code moved to the Java code can be reused by many Gradle sub-projects,
-      contrarily to the scripts which need to be repeated in each <code>build.gradle.kts</code> file.
-      The Java code in the Gradle plugin can contain the following methods:
+      are the full <code>sourceSets</code> configuration, together with the class-path and module-path settings,
+      and the <code>--source-module-path</code>, <code>--add-modules</code> and <code>--patch-modules</code> options.
+      Some (but not all) <code>--add-exports</code> options can also be managed by the plugin.
+      Source code of a plugin developed specifically for Apache SIS can be seen below.
+      It could be generalized to arbitrary projects if there is an interest.
     </p>
-
-    <pre class="snippet">public class Modularization implements Plugin&lt;Project&gt; {
-    @Override
-    public void <b>apply</b>(Project project) {
-        project.getPluginManager().apply(JavaPlugin.class);     <span class="note">// This plugin depends on the Java plugin.</span>
-        <b>setSourceModulePaths</b>(project);
-        TaskContainer tasks = project.getTasks();
-        tasks.withType(JavaCompile.class).forEach((task) -> {
-            task.doFirst(Modularization::<b>setDependencyModulePath</b>);
-        });
-    }
-
-    /*
-     * <span class="note">This method replaces the <code>sourceSets</code> block in the <code>build.gradle.kts</code> file.</span>
-     */
-    private static void <b>setSourceModulePaths</b>(Project project) {
-        SourceSetContainer sources = project.getExtensions().getByType(SourceSetContainer.class);
-        SourceSet          main    = sources.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
-        SourceSet          test    = sources.getByName(SourceSet.TEST_SOURCE_SET_NAME);
-        File[]             modules = project.file(<span class="use">"src"</span>).listFiles(File::isDirectory);
-        if (modules == null) {
-            throw new IllegalArgumentException("Not a directory: src");
-        }
-        File[] mainDirs = new File[modules.length];
-        File[] testDirs = new File[modules.length];
-        for (int i=0; i&lt;modules.length; i++) {
-            mainDirs[i] = new File(modules[i], "<span class="use">main</span>/<span class="del">java</span>");
-            testDirs[i] = new File(modules[i], "<span class="use">test</span>/<span class="del">java</span>");
-        }
-        main.getJava().setSrcDirs(Arrays.asList(mainDirs));
-        test.getJava().setSrcDirs(Arrays.asList(testDirs));
-    }
-
-    /*
-     * <span class="note">This method replaces the following lines from the <code>build.gradle.kts</code> file.</span>
-     *
-     * options.compilerArgs.add(<span class="string">"--module-path=${classpath.asPath}"</span>)
-     * setClasspath(files())
-     */
-    private static void <b>setDependencyModulePath</b>(Task task) {
-        JavaCompile    compile = (JavaCompile) task;
-        Project        project = compile.getProject();
-        CompileOptions options = compile.getOptions();
-        List&lt;String&gt; args = options.getCompilerArgs();
-        args.add(<span class="string">"--module-path"</span>);
-        args.add(compile.getClasspath().getAsPath());
-        compile.setClasspath(project.files());          <span class="note">// For avoiding duplication with the --module-path option.</span>
-    }
-}</pre>
+    <ul>
+      <li><a href="https://github.com/Geomatys/sis/blob/Jigsaw/buildSrc/src/org.apache.sis.buildtools/main/org/apache/sis/buildtools/gradle/CompileExtension.java">CompileExtension.java</a></li>
+      <li><a href="https://github.com/Geomatys/sis/blob/Jigsaw/buildSrc/src/org.apache.sis.buildtools/main/org/apache/sis/buildtools/gradle/TestExtension.java">TestExtension.java</a></li>
+    </ul>
 
     <h3>3.1) Gradle issues and workarounds</h3>
     <p>
-      Above configuration works but has the following problems with Gradle 8.1.
+      Above configuration works but has the following problems with Gradle 8.2.
       Workarounds for current Gradle version are presented in this section.
       Proposed Gradle evolutions are proposed in a <a href="#gradle-proposals">later section</a>.
     </p>
@@ -584,7 +576,7 @@ tasks.compileTestJava {
       However this automatic dispatching is enabled only if Gradle believes that the sub-project
       being compiled is itself a <abbr title="Java Platform Module System">JPMS</abbr> module,
       and Gradle does not recognize above configuration as such. The Gradle's
-      <a href="https://docs.gradle.org/8.1/javadoc/org/gradle/api/jvm/ModularitySpec.html"><code>ModularitySpec</code></a>
+      <a href="https://docs.gradle.org/8.2/javadoc/org/gradle/api/jvm/ModularitySpec.html"><code>ModularitySpec</code></a>
       class does not provide an option for forcing the activation of automatic dispatching.
       Our current workaround is to do nothing.
       This is not clean, but <code>javac</code> seems to work anyway with everything on the module path.
@@ -592,9 +584,9 @@ tasks.compileTestJava {
     <h4>3.1.2) Repeated module path</h4>
     <p>
       Adding the <code>--module-path</code> in the compiler options cause the option to appear twice
-      in the debug output of Gradle 8.1. The two occurrences have the exact same path, which may be large.
+      in the debug output of Gradle 8.2. The two occurrences have the exact same path, which may be large.
       We found no way to prevent that duplication, as it does not appear in the list returned by
-      <a href="https://docs.gradle.org/8.1/javadoc/org/gradle/api/tasks/compile/CompileOptions.html#getCompilerArgs--"><code>CompilerOptions.getCompilerArgs()</code></a>.
+      <a href="https://docs.gradle.org/8.2/javadoc/org/gradle/api/tasks/compile/CompileOptions.html#getCompilerArgs--"><code>CompilerOptions.getCompilerArgs()</code></a>.
       Our current workaround is to do nothing,
       as <code>javac</code> seems to work anyway with duplicated elements on the module path.
     </p>
@@ -606,7 +598,7 @@ tasks.compileTestJava {
       But the Gradle's debug output seems to unconditionally provide the latter option at least with an empty string,
       because the empty string has a different meaning than the default <code>javac</code> value.
       Using the Gradle <abbr>API</abbr> for setting the source path to <code>null</code> does not help since Gradle
-      <a href="https://docs.gradle.org/8.1/javadoc/org/gradle/api/tasks/compile/CompileOptions.html#getSourcepath--">interprets that as an empty path</a>.
+      <a href="https://docs.gradle.org/8.2/javadoc/org/gradle/api/tasks/compile/CompileOptions.html#getSourcepath--">interprets that as an empty path</a>.
       We saw no <abbr>API</abbr> for telling Gradle to omit completely that option.
       This is a problem since the <code>--module-source-path</code> option is necessary for specifying the
       <code><span class="use">src</span>/<span class="new">*</span>/<span class="use">main</span>/<span class="del">java</span></code> pattern.
@@ -742,7 +734,7 @@ tasks.compileTestJava {
     <h4>5.1.1) Explicit control over "class-path versus module-path" detection</h4>
     <p>
       Complete or replace the <code>inferModulePath</code> property in
-      <a href="https://docs.gradle.org/8.1/javadoc/org/gradle/api/jvm/ModularitySpec.html"><code>ModularitySpec</code></a>
+      <a href="https://docs.gradle.org/8.2/javadoc/org/gradle/api/jvm/ModularitySpec.html"><code>ModularitySpec</code></a>
       for making possible to force the automatic dispatching of dependencies between class-path and module-path,
       without relying on the conditions documented in the <code>getInferModulePath()</code> method.
       This enhancement may not be needed if Gradle decides to support Source Module Hierarchy itself,
@@ -752,14 +744,14 @@ tasks.compileTestJava {
     <h4 id="javac-options">5.1.2) Full control over all Java compiler options</h4>
     <p>
       Provide a way to set the all compiler options, including the ones managed by Gradle itself.
-      Currently the <a href="https://docs.gradle.org/8.1/javadoc/org/gradle/api/tasks/compile/CompileOptions.html"><code>CompilerOptions</code></a>
+      Currently the <a href="https://docs.gradle.org/8.2/javadoc/org/gradle/api/tasks/compile/CompileOptions.html"><code>CompilerOptions</code></a>
       class has a <code>getCompilerArgs()</code> method providing a mutable list,
       but that list is only for <em>additional</em> options appended after the options managed by Gradle.
       There is also a <code>get<u>All</u>CompilerArgs()</code> method, but that list is immutable.
       The reason why full control on all compiler options is sometime desired
       is because latest Java releases may have new features that are incompatible with the options managed by Gradle.
       Example of incompatible new Java compiler options are <code>-release</code> and <code>--module-source-path</code>.
-      The former is supported by Gradle 8.1, but not the latter. Even if Gradle resolves this incompatibility,
+      The former is supported by Gradle 8.2, but not the latter. Even if Gradle resolves this incompatibility,
       we can not know in advance what would be the next incompatible options in future Java releases.
       We may also want to do cleanups such as removing the <code>--module-path</code> duplication.
     </p>
