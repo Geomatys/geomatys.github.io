@@ -563,7 +563,7 @@ tasks.test {
       Proposed Gradle evolutions are proposed in a <a href="#gradle-proposals">later section</a>.
       The issue that caused the greatest difficulties for us is the Gradle automatic dispatching
       of dependencies between the <code>--class-path</code> and <code>--module-path</code> options.
-      Issues 3.1.3 to 3.1.5 could be summarized as " Insufficient control on the options passed to the command".
+      The other issues could be summarized as "Insufficient control on the options passed to the command".
     </p>
     <h4>3.1.1) Automatic dispatching between class-path and module-path does not work</h4>
     <p>
@@ -576,7 +576,8 @@ tasks.test {
       The Gradle's
       <a href="https://docs.gradle.org/8.2/javadoc/org/gradle/api/jvm/ModularitySpec.html"><code>ModularitySpec</code></a>
       class does not provide an option for forcing the activation of automatic dispatching.
-      The current workaround is to overwrite the class-path and module-path defined by Gradle.
+      The current workaround is to make explicit calls to methods of Gradle API such as
+      <code>setClasspath(…)</code> for overwriting the class-path and module-path defined by Gradle.
     </p>
     <h4>3.1.2) Automatic dispatching between class-path and module-path is not always desirable</h4>
     <p>
@@ -592,14 +593,13 @@ tasks.test {
     </p>
     <h4>3.1.3) Unexpected class-path changes after configuration</h4>
     <p>
-      In the Javadoc task, the explicit modification of class-path and module-path is made more difficult
-      by the fact that the class-path is modified by Gradle after our configuration.
-      So the class-path was incomplete at the time we copied the entries to the module-path,
-      and the class-path get undesired new entries after we cleared it.
-      It cause Javadoc generation to fail.
-      We have been unable to find a workaround for fixing the build.
-      However a manual workaround exists by opening <code>build/tmp/javadoc/javadoc.options</code> in an editor,
-      move the <code>-classpath</code> content to <code>--module-path</code>,
+      In the Javadoc task, it is difficult to modify the class-path and module-path options
+      because the class-path is modified again by Gradle after our configuration.
+      So the class-path was incomplete at the time we copied its entries to the module-path,
+      and the class-path receives undesired new entries after we cleared it.
+      This behavior causes Javadoc generation to fail, with no workaround we could find so far.
+      However a manual workaround exists by opening the <code>build/tmp/javadoc/javadoc.options</code>
+      file in an editor, move the <code>-classpath</code> content to <code>--module-path</code>,
       then run <code>javadoc @build/tmp/javadoc/javadoc.options</code> on the command line.
       Because Javadoc are generated less often than compilation,
       we think that this workaround is acceptable until a better solution become available.
@@ -786,16 +786,62 @@ tasks.test {
       There is also inconvenient, but the intend is not to force developers to use Source Module Hierarchy.
       The intend is to make easy to use either the package or source module hierarchy when desired.
       Gradle could help in different ways, described below.
+      The most critical issue, almost a blocker, is the first one.
     </p>
     <h4>6.1.1) Explicit control over "class-path versus module-path" detection</h4>
     <p>
-      Complete or replace the <code>inferModulePath</code> property in
+      The current automatic dispatching of dependencies on class-path <i>versus</i> module-path does not work with Module Source Hierarchy.
+      Even if it was fixed, it would break again if a new hierarchy was introduced in the future.
+      Even if an automagic algorithm was able to work for every hierarchies, automatic dispatching is not always desirable.
+      Sometime the developer really wants a dependency to be declared on <code>--module-path</code> even if it is not modularized,
+      because the consequences on the modules that use this dependency are not the same.
+    </p><p>
+      We could complete or replace the <code>inferModulePath</code> property in
       <a href="https://docs.gradle.org/8.2/javadoc/org/gradle/api/jvm/ModularitySpec.html"><code>ModularitySpec</code></a>
-      for making possible to force the automatic dispatching of dependencies between class-path and module-path,
+      for making possible to force the automatic dispatching of dependencies between class-path and module-path
       without relying on the conditions documented in the <code>getInferModulePath()</code> method.
-      This enhancement may not be needed if Gradle decides to support Source Module Hierarchy itself,
-      but it may by nice to have for the reasons given in section about
-      <a href="#javac-options">full control over compiler options</a>.
+      Alternatively Gradle could be enhanced for recognizing the Source Module Hierarchy itself.
+      But in any cases, we would still need a way to <em>force</em> a dependency to be on the module-path no matter what Gradle thinks.
+      One possibility may be to expand the syntax of <code>dependencyResolutionManagement</code>.
+      For example (<span class="use">green elements</span> are what currently exist,
+      <span class="new">blue element</span> is tne proposal with exact syntax to be discussed):
+    </p>
+    <pre class="snippet"><span class="use">dependencyResolutionManagement</span> {
+    <span class="use">versionCatalogs</span> {
+        <span class="use">create</span>(<span class="string">"libs"</span>) {
+            <span class="use">library</span>(<span class="string">"jts.core"</span>, <span class="string">"org.locationtech.jts"</span>, <span class="string">"jts-core"</span>) {
+                <span class="use">version</span> {
+                    <span class="use">strictly</span>(<span class="string">"[1.15, 2.0["</span>)
+                    <span class="use">prefer</span>(<span class="string">"1.19.0"</span>)
+                }
+                <span class="new">JPMS</span> {
+                  <span class="new">type</span>(<span class="string">"module"</span>)   <span class="note">// Other allowed values: "unnamed" or "auto" (the default)</span>
+                }
+            }
+        }
+    }
+}</pre>
+    <p>
+      The <code><span class="new">type</span>(<span class="string">"module"</span>)</code> element would mean
+      "always put this dependency on the <code>--module-path</code> option".
+      Conversely <code><span class="new">type</span>(<span class="string">"unnamed"</span>)</code>
+      would mean to always put on the <code>--class-path</code> option,
+      and <code><span class="new">type</span>(<span class="string">"auto"</span>)</code>
+      would be the current behavior.
+      The rational for putting this information in <code>dependencyResolutionManagement</code> is that,
+      like version numbers, the dependency type (module <i>versus</i> unnamed) should be consistent in all sub-projects.
+      This is because a larger project combining many sub-projects will be able to make only one "class-path versus module-path"
+      choice per dependency.
+    </p><p>
+      This <code><span class="new">type</span>(<span class="string">"module"</span>)</code> proposal is the only thing
+      that we need for resolving the biggest difficulty encountered so far in using Gradle with Module Source Hierarchy.
+      However this new <code><span class="new">JPMS</span></code> block could be extended in the future with more features.
+      For example we could define an
+      <code><span class="new">importAllPackages</span>(<span class="string">"org.apache.sis.*"</span>)</code> method
+      meaning that when this dependency is used, then an <code>--add-exports</code> compiler option should be automatically added
+      for exporting to that dependency all non-exported packages of each module whose name starts with <code>"org.apache.sis."</code>.
+      It would be useful for testing with JUnit.
+      Similar methods could be added for <code>--add-opens</code>, <code>--patch-module</code>, <i>etc.</i>
     </p>
     <h4 id="javac-options">6.1.2) Full control over all Java compiler options</h4>
     <p>
@@ -808,8 +854,15 @@ tasks.test {
       is because latest Java releases may have new features that are incompatible with the options managed by Gradle.
       Example of incompatible new Java compiler options are <code>-release</code> and <code>--module-source-path</code>.
       The former is supported by Gradle 8.2, but not the latter. Even if Gradle resolves this incompatibility,
-      we can not know in advance what would be the next incompatible options in future Java releases.
+      we cannot know in advance what would be the next incompatible options in future Java releases.
       We may also want to do cleanups such as removing the <code>--module-path</code> duplication.
+    </p>
+    <p>
+      The same argument applies to other tools as well.
+      Currently the lack of full control on <code>javadoc</code> options is a blocker issue for generating the Javadoc,
+      forcing us to launch <code>javadoc</code> directly on the command-line instead.
+      We accept this problem as a hopefully temporary inconvenience since Javadoc is not generated
+      as often as the <abbr>JAR</abbr> files.
     </p>
     <h4>6.1.3) Allow to specify the test classes as a list of <code>java.lang.Class</code> objects</h4>
     <p>
