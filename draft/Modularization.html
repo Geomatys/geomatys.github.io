@@ -561,27 +561,50 @@ tasks.test {
       Above configuration works but has the following problems with Gradle 8.2.
       Workarounds for current Gradle version are presented in this section.
       Proposed Gradle evolutions are proposed in a <a href="#gradle-proposals">later section</a>.
+      The issue that caused the greatest difficulties for us is the Gradle automatic dispatching
+      of dependencies between the <code>--class-path</code> and <code>--module-path</code> options.
+      Issues 3.1.3 to 3.1.5 could be summarized as " Insufficient control on the options passed to the command".
     </p>
     <h4>3.1.1) Automatic dispatching between class-path and module-path does not work</h4>
     <p>
-      The <code>--module-path</code> option provided by ourselves in above script
-      duplicates fully the <code>--class-path</code> option provided by Gradle.
-      We avoid collision by resetting the class-path to an empty set of files,
-      with a call to <code>setClasspath(…)</code> which overwrites the Gradle settings.
-      But this hack puts everything on the module-path, including non-modular dependencies.
-      In practice it seems to work anyway, but it would be cleaner if we could dispatch dependencies
-      between the class-path and module-path according wether each dependency is a module or not.
-      In theory such dispatching is done automatically by Gradle,
-      so we should not need to provide the <code>--module-path</code> option at all.
-      However this automatic dispatching is enabled only if Gradle believes that the sub-project
-      being compiled is itself a <abbr title="Java Platform Module System">JPMS</abbr> module,
-      and Gradle does not recognize above configuration as such. The Gradle's
+      Gradle uses a set of heuristic rules for deciding if a dependency should be declared on the class-path or on the module-path.
+      But heuristic rules tend to work well only in some specific contexts, which is currently restricted to package hierarchy.
+      As of Gradle 8.2.1, those heuristic rules do not recognize any module in our Source Module Hierarchy.
+      In particular, the automatic dispatching of dependencies is enabled only if Gradle believes that the
+      sub-project being compiled is itself a <abbr title="Java Platform Module System">JPMS</abbr> module,
+      and Gradle does not recognize above configuration as such.
+      The Gradle's
       <a href="https://docs.gradle.org/8.2/javadoc/org/gradle/api/jvm/ModularitySpec.html"><code>ModularitySpec</code></a>
       class does not provide an option for forcing the activation of automatic dispatching.
-      Our current workaround is to do nothing.
-      This is not clean, but <code>javac</code> seems to work anyway with everything on the module path.
+      The current workaround is to overwrite the class-path and module-path defined by Gradle.
     </p>
-    <h4>3.1.2) Repeated module path</h4>
+    <h4>3.1.2) Automatic dispatching between class-path and module-path is not always desirable</h4>
+    <p>
+      The Gradle <code>ModularitySpec</code> implementation could be improved for recognizing a larger set of hierarchies,
+      but even better automatic detection will not always work.
+      Sometime we want to force a dependency to be on the module-path no matter what Gradle thinks.
+      It happens for example when a dependency has no <code>module-info.class</code> file
+      and no <code>Automatic-Module-Name</code> entry in the <code>MANIFEST.MF</code> file,
+      but we still want to handle it as an automatic module.
+      Some may argue that this is bad practice, but this is sometime necessary for getting tools to work.
+      In Apache <abbr>SIS</abbr> case, all those automatic modules are optional dependencies.
+      We need a way to control whether a dependency should be considered as a module or not on a case-by-case basis.
+    </p>
+    <h4>3.1.3) Unexpected class-path changes after configuration</h4>
+    <p>
+      In the Javadoc task, the explicit modification of class-path and module-path is made more difficult
+      by the fact that the class-path is modified by Gradle after our configuration.
+      So the class-path was incomplete at the time we copied the entries to the module-path,
+      and the class-path get undesired new entries after we cleared it.
+      It cause Javadoc generation to fail.
+      We have been unable to find a workaround for fixing the build.
+      However a manual workaround exists by opening <code>build/tmp/javadoc/javadoc.options</code> in an editor,
+      move the <code>-classpath</code> content to <code>--module-path</code>,
+      then run <code>javadoc @build/tmp/javadoc/javadoc.options</code> on the command line.
+      Because Javadoc are generated less often than compilation,
+      we think that this workaround is acceptable until a better solution become available.
+    </p>
+    <h4>3.1.4) Repeated module path</h4>
     <p>
       Adding the <code>--module-path</code> in the compiler options cause the option to appear twice
       in the debug output of Gradle 8.2. The two occurrences have the exact same path, which may be large.
@@ -590,7 +613,7 @@ tasks.test {
       Our current workaround is to do nothing,
       as <code>javac</code> seems to work anyway with duplicated elements on the module path.
     </p>
-    <h4>3.1.3) Source path incompatibility</h4>
+    <h4>3.1.5) Source path incompatibility</h4>
     <p>
       In the same way that <code>--class-path</code> and <code>--module-path</code> should specify mutually exclusive sets,
       <code>--source-path</code> and <code>--module-source-path</code> should also be mutually exclusive options.
