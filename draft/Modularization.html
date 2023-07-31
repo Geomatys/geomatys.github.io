@@ -77,7 +77,7 @@
   </head>
   <body>
     <h1>Java <i>Module Source Hierarchy</i> in a Gradle sub-project</h1>
-    <p style="color:gray">Martin Desruisseaux (Geomatys), last edited in July 29, 2023</p>
+    <p style="color:gray">Martin Desruisseaux (Geomatys), last edited in July 31, 2023</p>
     <p>
       Since the release of Java 9 and the Java Platform Module System (<abbr>JPMS</abbr>, code-named "Jigsaw"),
       the tendency in Maven or Gradle projects is to either ignore JPMS,
@@ -953,15 +953,15 @@ tasks.test {
       Currently the <a href="https://docs.gradle.org/8.2/javadoc/org/gradle/api/tasks/compile/CompileOptions.html"><code>CompilerOptions</code></a>
       class has a <code>getCompilerArgs()</code> method providing a mutable list,
       but that list is only for <em>additional</em> options appended after the options managed by Gradle.
-      There is also a <code>get<u>All</u>CompilerArgs()</code> method, but that list is immutable.
+      There is also a <code>get<u>All</u>CompilerArgs()</code> method, but that list is unmodifiable.
       The reason why full control on all compiler options is sometime desired
       is because latest Java releases may have new features that are incompatible with the options managed by Gradle.
-      Example of incompatible new Java compiler options are <code>-release</code> and <code>--module-source-path</code>.
-      The former is supported by Gradle 8.2, but not the latter. Even if Gradle resolves this incompatibility,
-      we cannot know in advance what would be the next incompatible options in future Java releases.
+      An example of incompatible Java compiler options is <code>--module-source-path</code> versus <code>--source-path</code>.
+      Even if Gradle resolves this incompatibility, other incompatible options existed in the past
+      (for example <code>-release</code> versus <code>-source</code> and <code>-target</code>) and
+      we cannot know in advance what will be the next incompatible options in future Java releases.
       We may also want to do cleanups such as removing the <code>--module-path</code> duplication.
-    </p>
-    <p>
+    </p><p>
       The same argument applies to other tools as well.
       Currently the lack of full control on <code>javadoc</code> options is a blocker issue for generating the Javadoc,
       forcing us to launch <code>javadoc</code> directly on the command-line instead.
@@ -976,5 +976,47 @@ tasks.test {
       Other reasons why developers way want to instantiate the <code>Class</code> themselves may be if they need
       some control on the <code>ClassLoader</code> or <code>ModuleLayer</code> to use for loading the classes.
     </p>
+    <h4>7.1.4) Easier way to add <code>--add-exports</code> options</h4>
+    <p>
+      It is currently tedious to add <code>--add-reads</code> and <code>--add-exports</code> options.
+      Furthermore the same options need to be specified in different places, such as <code>javac</code>
+      and the <code>java</code> command for executing tests. A convenient place where some options could
+      be specified would be in the dependency declarations, because the options usually need to be the same
+      for all usage of a dependency. Example:
+    </p>
+    <pre class="snippet"><span class="use">library</span>(<span class="string">"junit"</span>, <span class="string">"junit"</span>, <span class="string">"junit"</span>) {
+    <span class="use">version</span> {
+        <span class="use">prefer</span>(<span class="string">"4.13"</span>)
+    }
+    <span class="new">JPMS</span> {
+      <span class="new">importAllPackages</span>(<span class="string">"org.apache.sis.*"</span>)
+    }
+}</pre>
+    <p>
+      The <code>importAllPackages(…)</code> statement would cause the following actions
+      to happen when the dependency is added to the class-path or module-path:
+    </p>
+    <ul>
+      <li>Search all modules with a name starting by <code><span class="string">"org.apache.sis."</span></code>.</li>
+      <li>For each matching module, search all packages that are not already exported to JUnit.</li>
+      <li>For each such package, add the following arguments
+          (the blue characters would be the parts generated automatically by Gradle):
+<pre>--add-exports <span class="string">org.apache.sis.foo</span>/<span class="new">org.apache.sis.bar1</span>=<span class="new">junit</span>
+--add-exports <span class="string">org.apache.sis.foo</span>/<span class="new">org.apache.sis.bar2</span>=<span class="new">junit</span>
+<span class="note">etc.</span></pre></li>
+    </ul>
+    <p>
+      The search for module names, package lists and exported packages can be done easily with <code>java.lang.module.ModuleDescriptor</code>.
+      A prototype (but not using above proposed syntax) is available in
+      <a href="https://github.com/Geomatys/sis/blob/Jigsaw/buildSrc/src/org.apache.sis.buildtools/main/org/apache/sis/buildtools/gradle/ModularTest.java">ModularTest</a>.
+    </p>
+    <h3 id="links">7.2) Links</h3>
+    <p>Issues created on bug trackers:</p>
+    <ul>
+      <li><a href="https://issues.apache.org/jira/browse/MNG-7855">MNG-7855 on Maven JIRA</a></li>
+      <li><a href="https://github.com/gradle/gradle/issues/25954">Issue #25954 on Gradle GitHub</a> — Dependencies wrongly put on class-path rather than module-path</li>
+      <li><a href="https://github.com/gradle/gradle/issues/25962">Issue #25962 on Gradle GitHub</a> — Full control over all options given to Java tools</li>
+      <li><a href="https://github.com/Geomatys/MavenModulepathBug">Maven and Gradler test case</a></li>
+    </ul>
   </body>
 </html>
