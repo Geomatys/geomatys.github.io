@@ -124,6 +124,7 @@
       <li><a href="#conclusion">Conclusion</a>
         <ul>
           <li><a href="#gradle-proposals">Ideas for Gradle evolution</a></li>
+          <li><a href="#links">Links to issues and test cases</a></li>
         </ul>
       </li>
     </ul>
@@ -803,6 +804,19 @@ tasks.test {
       the output directly in main source directory. In Apache <abbr>SIS</abbr> case this problem
       is hopefully temporary, because we plan to replace ANTLR generated code by hand-written code.
     </p>
+    <h3 id="NetBeans">5.3) Not rendered well in NetBeans 18</h3>
+    <p>
+      IntelliJ seems to open well the Apache SIS Gradle project with Module Source Hierarchy, but NetBeans has some glitches.
+      NetBeans 18 can compile, execute and debug that project, but the project tab does not show the <abbr>JPMS</abbr> module names.
+      NetBeans only shows "Source/Test Packages" with the directory name, which is the same for all modules.
+    </p>
+    <img src="sis_gradle_netbeans.png" alt="Screenshot of NetBeans project tab"/>
+    <p>
+      However among the many forms of projects that NetBeans supports,
+      one of them is "Java with Ant" → "Java Modular Project".
+      That form uses Module Source Hierarchy and prove that this layout can be rendered well in NetBeans at least with Ant projects.
+      Extending this support to Gradle projects is under investigation.
+    </p>
 
 
 
@@ -1010,12 +1024,13 @@ tasks.test {
       A prototype (but not using above proposed syntax) is available in
       <a href="https://github.com/Geomatys/sis/blob/Jigsaw/buildSrc/src/org.apache.sis.buildtools/main/org/apache/sis/buildtools/gradle/ModularTest.java">ModularTest</a>.
     </p>
-    <h3 id="links">7.2) Links</h3>
-    <p>Issues created on bug trackers:</p>
+    <h3 id="links">7.2) Links to issues and test cases</h3>
+    <p>Test cases demonstrating the problem, and issues created on bug trackers:</p>
     <ul>
       <li><a href="https://issues.apache.org/jira/browse/MNG-7855">MNG-7855 on Maven JIRA</a></li>
       <li><a href="https://github.com/gradle/gradle/issues/25954">Issue #25954 on Gradle GitHub</a> — Dependencies wrongly put on class-path rather than module-path</li>
       <li><a href="https://github.com/gradle/gradle/issues/25962">Issue #25962 on Gradle GitHub</a> — Full control over all options given to Java tools</li>
+      <li><a href="https://github.com/gradle/gradle/issues/25974">Issue #25974 on Gradle GitHub</a> — Support Module Source Hierarchy</li>
       <li><a href="https://github.com/Geomatys/MavenModulepathBug">Maven and Gradler test case</a></li>
     </ul>
   </body>
