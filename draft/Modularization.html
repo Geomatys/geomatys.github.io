@@ -77,7 +77,9 @@
   </head>
   <body>
     <h1>Java <i>Module Source Hierarchy</i> in a Gradle sub-project</h1>
-    <p style="color:gray">Martin Desruisseaux (Geomatys), last edited in July 31, 2023</p>
+    <p style="color:SeaGreen">Martin Desruisseaux (Geomatys), last edited in October 2023.<br>
+      This page has been partially copied to <a href="https://sis.apache.org/release-notes/1.4.html">Apache
+      <abbr title="Spatial Information System">SIS</abbr> 1.4 release notes</a>.</p>
     <p>
       Since the release of Java 9 and the Java Platform Module System (<abbr>JPMS</abbr>, code-named "Jigsaw"),
       the tendency in Maven or Gradle projects is to either ignore JPMS,
@@ -90,7 +92,7 @@
       Few peoples are aware that since Java 9, most Java tools,
       such as <code>javac</code> and <code>javadoc</code>,
       accept an alternative layout named <i>Module Hierarchy</i>
-      (source: <code>javac</code> <a href="https://docs.oracle.com/en/java/javase/20/docs/specs/man/javac.html#directory-hierarchies">Directory Hierarchies</a>).
+      (source: <code>javac</code> <a href="https://docs.oracle.com/en/java/javase/21/docs/specs/man/javac.html#directory-hierarchies">Directory Hierarchies</a>).
       The latter is used for example by the OpenJDK project itself.
     </p><p>
       Since Java 9, the <code>javac</code> and <code>javadoc</code> tools can process
@@ -102,7 +104,7 @@
       facilitates the reuse of test fixtures between modules, and more.
       However taking full advantage of <abbr title="Java Platform Module System">JPMS</abbr>
       requires changes in the directory layout compared to Maven and Gradle conventions.
-      As of June 2023, both Maven and Gradle support only the directory layout known as <i>Package Hierarchy</i>.
+      As of October 2023, both Maven and Gradle support only the directory layout known as <i>Package Hierarchy</i>.
       This page describes how the alternative <i>Module Source Hierarchy</i>
       can be applied to the <a href="https://sis.apache.org/">Apache SIS</a> project.
       The layout described below is currently very difficult to apply with Maven,
@@ -229,7 +231,6 @@
       modules between <abbr title="Java Platform Module System">JPMS</abbr> modules and Gradle sub-projects.
       For more generic discussion about Gradle configuration, jump to the <a href="#gradle-config">next section</a>.
     </p><p>
-
       The tree on the left side shows the current directory layout as of May 2023, which follows Maven conventions.
       The tree on the right side shows a new directory layout proposal.
       The <span class="new">names in blue</span> are new directory levels.
@@ -522,19 +523,19 @@ fun addAllModules(args : List&lt;String&gt;) {
 }
 
 tasks.compileJava {
-    options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">src</span>/<span class="new">*</span>/<span class="use">main</span>/<span class="del">java</span>"</span>)
+    options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">${srcDir}</span>/<span class="new">*</span>/<span class="use">main</span>/<span class="del">java</span>"</span>)
     options.compilerArgs.add(<span class="string">"--module-path=${classpath.asPath}"</span>)
     setClasspath(files())   <span class="note">// For avoiding duplication with the <code>--module-path</code> option.</span>
     addAllModules(options.compilerArgs)
 }
 
 tasks.compileTestJava {
-    options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">src</span>/<span class="new">*</span>/<span class="use">test</span>/<span class="del">java</span>"</span>)
+    options.compilerArgs.add(<span class="string">"--module-source-path=<span class="use">${srcDir}</span>/<span class="new">*</span>/<span class="use">test</span>/<span class="del">java</span>"</span>)
     options.compilerArgs.add(<span class="string">"--module-path=${classpath.asPath}"</span>)
     setClasspath(files())
     srcDir.list().forEach {
         options.compilerArgs.add(<span class="string">"--patch-module"</span>)
-        options.compilerArgs.add(<span class="string">"${it}=<span class="use">src</span>/${it}/<span class="use">test</span>/<span class="del">java</span>"</span>)
+        options.compilerArgs.add(<span class="string">"${it}=<span class="use">${srcDir}</span>/${it}/<span class="use">test</span>/<span class="del">java</span>"</span>)
         options.compilerArgs.add(<span class="string">"--add-reads"</span>)
         options.compilerArgs.add(<span class="string">"${it}=org.apache.sis.test,junit"</span>)
     }
@@ -575,15 +576,15 @@ tasks.test {
       It could be generalized to arbitrary projects if there is an interest.
     </p>
     <ul>
-      <li><a href="https://github.com/Geomatys/sis/blob/Jigsaw/buildSrc/src/org.apache.sis.buildtools/main/org/apache/sis/buildtools/gradle/ModularCompilation.java">ModularCompilation.java</a></li>
-      <li><a href="https://github.com/Geomatys/sis/blob/Jigsaw/buildSrc/src/org.apache.sis.buildtools/main/org/apache/sis/buildtools/gradle/ModularTest.java">ModularTest.java</a></li>
+      <li><a href="https://github.com/apache/sis/blob/main/buildSrc/src/org.apache.sis.buildtools/main/org/apache/sis/buildtools/gradle/ModularCompilation.java">ModularCompilation.java</a></li>
+      <li><a href="https://github.com/apache/sis/blob/main/buildSrc/src/org.apache.sis.buildtools/main/org/apache/sis/buildtools/gradle/ModularTest.java">ModularTest.java</a></li>
     </ul>
 
     <h3 id="gradle-issues">3.1) Gradle issues and workarounds</h3>
     <p>
       Above configuration works but has the following problems with Gradle 8.2.
       Workarounds for current Gradle version are presented in this section.
-      Proposed Gradle evolutions are proposed in a <a href="#gradle-proposals">later section</a>.
+      Proposed Gradle evolutions are presented in a <a href="#gradle-proposals">later section</a>.
       The issue that caused the greatest difficulties for us is the Gradle automatic dispatching
       of dependencies between the <code>--class-path</code> and <code>--module-path</code> options,
       which is discussed first.
@@ -699,11 +700,12 @@ tasks.test {
       A native support of Module Source Hierarchy in Gradle would make easier to leverage those features
       with less needs to resort to hacks.
     </p>
-    <h3>4.2) Compile-time verification of Javadoc links</h3>
+    <h3>4.2) Compile-time verification of forward references</h3>
     <p>
       Suppose that module <var>B</var> depends on module <var>A</var>.
       Module <var>B</var> can have compile-time dependencies toward <var>A</var> (backward references),
-      but the converse (a forward reference from <var>A</var> to <var>B</var>) is illegal for the compiler.
+      but the converse (a forward reference from <var>A</var> to <var>B</var>)
+      is illegal for the compiler except in <code>module-info</code>.
       However such forward references are perfectly legal in <em>documentation</em>,
       and indeed the <code>javadoc</code> tool handles them well.
       It is possible to write Javadoc <code>{@link}</code> and <code>{@see}</code> tags in module <var>A</var> with
@@ -721,7 +723,19 @@ tasks.test {
       With the latter, all forward references are flagged as errors.
       With the former, compile-time verification of <code>{@link}</code> or <code>{@see}</code> tags,
       including forward references, works like a charm.
+    </p><p>
+      Another place where forward references are used is in <code>module-info</code> files.
+      The <code>opens</code> and <code>exports</code> statements can be qualified,
+      i.e., a package can be exported only to some specific modules.
+      Those modules are forward references, because they are dependents rather than dependencies.
+      But without Module Source Hierarchy, it is difficult for the compiler to know what those dependents are,
+      so any use of qualified exports generally produces warnings like below:
     </p>
+    <blockquote>
+      <code>endorsed/src/org.apache.sis.metadata/main/module-info.java:164:</code>
+      warning: [module] module not found: <code>org.apache.sis.gui</code>
+    </blockquote>
+
     <h3>4.3) Easier reuse of test fixtures</h3>
     <p>
       The test code for a module may create test fixtures, mocks or assertion methods
@@ -785,7 +799,7 @@ tasks.test {
     </p>
     <h3>5.1) No support from main build tools</h3>
     <p>
-      As of July 2023, neither Maven or Gradle provides out-of-the-box support for Module Source Hierarchy.
+      As of October 2023, neither Maven or Gradle provides out-of-the-box support for Module Source Hierarchy.
       A very good out-of-the-box support (actually the major source of inspiration for the proposal in this page)
       is provided by the NetBeans <abbr>IDE</abbr> when using the NetBeans Ant build system,
       but the NetBeans community itself encourages the use of Maven or Gradle instead of Ant.
@@ -1022,7 +1036,7 @@ tasks.test {
     <p>
       The search for module names, package lists and exported packages can be done easily with <code>java.lang.module.ModuleDescriptor</code>.
       A prototype (but not using above proposed syntax) is available in
-      <a href="https://github.com/Geomatys/sis/blob/Jigsaw/buildSrc/src/org.apache.sis.buildtools/main/org/apache/sis/buildtools/gradle/ModularTest.java">ModularTest</a>.
+      <a href="https://github.com/apache/sis/blob/main/buildSrc/src/org.apache.sis.buildtools/main/org/apache/sis/buildtools/gradle/ModularTest.java">ModularTest</a>.
     </p>
     <h3 id="links">7.2) Links to issues and test cases</h3>
     <p>Test cases demonstrating the problem, and issues created on bug trackers:</p>
