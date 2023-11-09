@@ -7,3 +7,5 @@ layout: default
 Resources related to Geomatys activity with projects on GitHub.
 
 * [Draft paper on Apache SIS modularization](draft/Modularization.html)
+* Benchmarks
+  * [GeoTIFF](benchmarks/GeoTIFF.html)
