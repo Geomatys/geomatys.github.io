@@ -42,24 +42,35 @@
       </li>
     </ul>
     <p>
-      For testing, unzip the <code>apache-sis-2.0-SNAPSHOT.zip</code> file in any directory.
+      For testing, unzip the <code>"apache-sis-2.0-SNAPSHOT.zip"</code> file in any directory.
       The instructions on the <a href="https://sis.apache.org/command-line.html">Apache <abbr>SIS</abbr> web site</a>
-      can be applied, with only the ZIP file changed.
+      can be applied, with only the ZIP filename changed.
       Then copy the TestBed-19 experiment data nearby.
       Those data are an image of Didymos asteroid and its Dimorphos moonlet seen by the
       <abbr title="Double Asteroid Redirection Test">DART</abbr> before the impact,
       together with auxiliary files for referencing and metadata.
       The encoding experiment can be done by running the following commands in a Java shell (<code>jshell</code>).
+      Texts in green and blue are commands to enter in command-line and JShell respectively,
+      and texts in black are outputs.
       The paths to the Apache SIS directory and to the DART data directory may need to be adapted.
     </p>
-    <pre>./apache-sis-2.0-SNAPSHOT/bin/sis_shell</pre>
+    <pre><span class="bash">./apache-sis-2.0-SNAPSHOT/bin/sis_shell</span>
+|  Welcome to JShell -- Version 21
+|  For an introduction type: /help intro
 
-    <p>
-      The following commands are Java code executed in the JShell, not bash commands.
-      The first command encodes the <code>DART_camera.png</code> image in a new GeoTIFF file named <code>DART_camera.tiff</code>.
-      The second command verifies the result.
-    </p>
-    <pre>SIS.TRANSLATE.output("data/DART_camera.tiff").run("data/DART_camera.png")
-SIS.CRS.run("data/DART_camera.tiff")</pre>
+<span class="jshell">SIS.TRANSLATE.output("data/DART_camera.tiff").run("data/DART_camera.png")</span>
+<span class="echo">sis translate --output "data/DART_camera.tiff" "data/DART_camera.png"</span>
+WARNING  [WorldFileStore] No spatial or temporal dimension has been found in "DART spacecraft spherical CRS".
+
+<span class="jshell">SIS.CRS.run("data/DART_camera.tiff")</span>
+<span class="echo">sis crs "data/DART_camera.tiff"</span>
+EngineeringCRS["DART spacecraft spherical CRS",
+  EngineeringDatum["DART spacecraft spherical CRS"],
+  CS[spherical, 2],
+    Axis["Relative bearing (V)", CLOCKWISE],
+    Axis["Altitude (α)", up],
+    Unit["arc-second", 4.84813681109536E-6]]
+
+<span class="jshell">/exit</span></pre>
   </body>
 </html>

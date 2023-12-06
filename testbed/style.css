@@ -5,3 +5,26 @@ body {
 p {
   text-align: justify;
 }
+
+code, pre {
+  font-size: 14px;
+}
+
+pre {
+  margin-left: 60px;
+}
+
+span.bash {
+  font-weight: bold;
+  color: green;
+}
+
+span.jshell {
+  font-weight: bold;
+  color: steelblue;
+  background: aliceblue;
+}
+
+span.echo {
+  color: gray;
+}
