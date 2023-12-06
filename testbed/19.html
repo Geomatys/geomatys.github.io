@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OGC TestBed-19</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <h1>OGC TestBed-19</h1>
+    <p>
+      The <abbr title="Open Geospatial Consortium">OGC</abbr> TestBed-19 proposes extensions to existing
+      geospatial standards for handling data in space. At the most fundamental level, a few changes were
+      proposed for the <abbr title="International Organization for Standardization">ISO</abbr> 19111 standard.
+      Those changes are then propagated to the <a href="https://www.geoapi.org/">OGC GeoAPI</a> interfaces,
+      the <a href="https://sis.apache.org/">Apache <abbr title="Spatial Information System">SIS</abbr></a>
+      implementation, and the GeoTIFF tags.
+      Since the TestBed is experimental, those changes were applied in branches.
+      Links are given below, and their content may change at any time if future TestBeds continue this work
+      or if some proposals are integrated in standards.
+    </p>
+    <ul>
+      <li><p><b>Source code</b></p>
+        <ul>
+          <li><a href="https://github.com/Geomatys/geoapi/tree/TestBed-19">GeoAPI TestBed-19 branch</a>
+            — for new Coordinate Reference System type are related types.</li>
+          <li><a href="https://github.com/Geomatys/sis/tree/TestBed-19">Apache <abbr>SIS</abbr> TestBed-19 branch</a>
+            — for support of new GeoTIFF tags.</li>
+        </ul>
+      </li>
+      <li><p><b>Compiled code</b> (not an official release)</p>
+        <ul>
+          <li><a href="https://nexus.geomatys.com/repository/raw-public/testbed19/apache-sis-2.0-SNAPSHOT.zip">apache-sis-2.0-SNAPSHOT.zip</a>
+            — includes GeoAPI and Apache <abbr>SIS</abbr> branches.</li>
+        </ul>
+      </li>
+      <li><p><b>Requirements</b> (not included in above links)</p>
+        <ul>
+          <li>Java 11 or later (Java 21 is recommended).</li>
+          <li>Optionally, for visualization purpose only: <a href="https://openjfx.io/">Open JFX</a>.</li>
+        </ul>
+      </li>
+    </ul>
+    <p>
+      For testing, unzip the <code>apache-sis-2.0-SNAPSHOT.zip</code> file in any directory.
+      The instructions on the <a href="https://sis.apache.org/command-line.html">Apache <abbr>SIS</abbr> web site</a>
+      can be applied, with only the ZIP file changed.
+      Then copy the TestBed-19 experiment data nearby.
+      Those data are an image of Didymos asteroid and its Dimorphos moonlet seen by the
+      <abbr title="Double Asteroid Redirection Test">DART</abbr> before the impact,
+      together with auxiliary files for referencing and metadata.
+      The encoding experiment can be done by running the following commands in a Java shell (<code>jshell</code>).
+      The paths to the Apache SIS directory and to the DART data directory may need to be adapted.
+    </p>
+    <pre>./apache-sis-2.0-SNAPSHOT/bin/sis_shell</pre>
+
+    <p>
+      The following commands are Java code executed in the JShell, not bash commands.
+      The first command encodes the <code>DART_camera.png</code> image in a new GeoTIFF file named <code>DART_camera.tiff</code>.
+      The second command verifies the result.
+    </p>
+    <pre>SIS.TRANSLATE.output("data/DART_camera.tiff").run("data/DART_camera.png")
+SIS.CRS.run("data/DART_camera.tiff")</pre>
+  </body>
+</html>
