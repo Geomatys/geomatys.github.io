@@ -58,9 +58,8 @@
 |  Welcome to JShell -- Version 21
 |  For an introduction type: /help intro
 
-<span class="jshell">SIS.TRANSLATE.output("data/DART_camera.tiff").run("data/DART_camera.png")</span>
-<span class="echo">sis translate --output "data/DART_camera.tiff" "data/DART_camera.png"</span>
-WARNING  [WorldFileStore] No spatial or temporal dimension has been found in "DART spacecraft spherical CRS".
+<span class="jshell">SIS.TRANSLATE.metadata("*.xml").output("data/DART_camera.tiff").run("data/DART_camera.png")</span>
+<span class="echo">command&gt; sis translate --metadata "*.xml" --output "/tmp/test.tiff" "data/DART_camera.png"</span>
 
 <span class="jshell">SIS.CRS.run("data/DART_camera.tiff")</span>
 <span class="echo">sis crs "data/DART_camera.tiff"</span>
