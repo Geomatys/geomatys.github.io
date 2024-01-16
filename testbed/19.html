@@ -44,11 +44,15 @@
     <p>
       For testing, unzip the <code>"apache-sis-2.0-SNAPSHOT.zip"</code> file in any directory.
       The instructions on the <a href="https://sis.apache.org/command-line.html">Apache <abbr>SIS</abbr> web site</a>
-      can be applied, with only the ZIP filename changed.
-      Then copy the TestBed-19 experiment data nearby.
+      can be applied, with only the ZIP filename changed. Then copy the
+      <a href="https://github.com/opengeospatial/testbed_resources/tree/main/Testbed-19/space/data">TestBed-19 experiment data</a> nearby.
       Those data are an image of Didymos asteroid and its Dimorphos moonlet seen by the
       <abbr title="Double Asteroid Redirection Test">DART</abbr> before the impact,
       together with auxiliary files for referencing and metadata.
+    </p>
+
+    <h2>Coordinate Reference System in GeoTIFF</h2>
+    <p>
       The encoding experiment can be done by running the following commands in a Java shell (<code>jshell</code>).
       Texts in green and blue are commands to enter in command-line and JShell respectively,
       and texts in black are outputs.
@@ -71,5 +75,17 @@ EngineeringCRS["DART spacecraft spherical CRS",
     Unit["arc-second", 4.84813681109536E-6]]
 
 <span class="jshell">/exit</span></pre>
+
+    <h2>Coordinate transformations</h2>
+    <p>
+      The Coordinate Reference System (<abbr>CRS</abbr>) encoded in GeoTIFF does not specify how this <abbr>CRS</abbr>
+      is related to the Earth or other bodies. This relationship is specified in separated files,
+      using Geographic Markup Language (<abbr>GML</abbr>) in the Testbed-19 experiment.
+      The execution of a chain of operations up to pixel coordinates in above GeoTIFF image
+      is performed by the <code>org.opengis.testbed.T19D001.Demo</code> Java file in the
+      <a href="https://github.com/opengeospatial/testbed_resources/tree/main/Testbed-19/space">GitHub repository</a>
+      As of January 2024, this demo requires a local build of Apache SIS from the above-cited sources.
+      This is because the features experimented in Testbed-19 are not yet integrated in OGC standards.
+    </p>
   </body>
 </html>
