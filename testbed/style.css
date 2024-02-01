@@ -27,4 +27,9 @@ span.jshell {
 
 span.echo {
   color: gray;
+  background: #F8F8F8;
+}
+
+span.output {
+  color: #000030;
 }

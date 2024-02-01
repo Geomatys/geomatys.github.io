@@ -22,10 +22,10 @@
     <ul>
       <li><p><b>Source code</b></p>
         <ul>
-          <li><a href="https://github.com/Geomatys/geoapi/tree/TestBed-19">GeoAPI TestBed-19 branch</a>
+          <li><a href="https://github.com/opengeospatial/geoapi/tree/Testbed-19">GeoAPI TestBed-19 branch</a>
             — for new Coordinate Reference System type are related types.</li>
           <li><a href="https://github.com/Geomatys/sis/tree/TestBed-19">Apache <abbr>SIS</abbr> TestBed-19 branch</a>
-            — for support of new GeoTIFF tags.</li>
+            — for implementation of above-cited new types and for support of new GeoTIFF tags.</li>
         </ul>
       </li>
       <li><p><b>Compiled code</b> (not an official release)</p>
@@ -63,29 +63,82 @@
 |  For an introduction type: /help intro
 
 <span class="jshell">SIS.TRANSLATE.metadata("*.xml").output("data/DART_camera.tiff").run("data/DART_camera.png")</span>
-<span class="echo">command&gt; sis translate --metadata "*.xml" --output "/tmp/test.tiff" "data/DART_camera.png"</span>
+<span class="echo">command&gt; sis translate --metadata "*.xml" --output "data/DART_camera.tiff" "data/DART_camera.png"</span>
 
 <span class="jshell">SIS.CRS.run("data/DART_camera.tiff")</span>
-<span class="echo">sis crs "data/DART_camera.tiff"</span>
-EngineeringCRS["DART spacecraft spherical CRS",
-  EngineeringDatum["DART spacecraft spherical CRS"],
+<span class="echo">command&gt; sis crs "data/DART_camera.tiff"</span>
+<span class="output">EngineeringCRS["DART spacecraft spherical CRS",
+  EngineeringDatum["DART center of mass"],
   CS[spherical, 2],
     Axis["Relative bearing (V)", CLOCKWISE],
     Axis["Altitude (α)", up],
-    Unit["arc-second", 4.84813681109536E-6]]
+    Unit["arc-second", 4.84813681109536E-6]]</span></pre>
+
+    <h2>Coordinate transformations using <abbr>GML</abbr> descriptions</h2>
+    <p>
+      The Coordinate Reference System (<abbr>CRS</abbr>) encoded in GeoTIFF does not specify how this <abbr>CRS</abbr>
+      is related to the Earth or other bodies. This relationship is specified in
+      <a href="https://github.com/opengeospatial/testbed_resources/tree/main/Testbed-19/space/data/coordinate-transformations">separated files</a>,
+      using Geographic Markup Language (<abbr>GML</abbr>) in the Testbed 19 experiment.
+      The rest of this page shows how such a chain of operations can be concatenated
+      with information encoded in the GeoTIFF file. The result is a chain of operations
+      from a <abbr>CRS</abbr> in space to pixel coordinates in the GeoTIFF image.
+      This demonstration transforms the points
+      <a href="https://github.com/opengeospatial/testbed_resources/blob/main/Testbed-19/space/data/PointOfInterests.csv">listed in a <abbr title="Comma Separated Values">CSV</abbr> file</a>.
+      Coordinates are expressed in above DART Engineering <abbr>CRS</abbr> extended to a four-dimensional space.
+      That four-dimensional <abbr>CRS</abbr> is described in a <abbr>GML</abbr> file and can be seen with the following command in the JShell environment
+      (replace <var>&lt;directory&gt;</var> by the directory where data were copied –
+      this demo needs a <abbr>URI</abbr> rather than a file path because it references a fragment of the file):
+    </p>
+
+  <pre><span class="jshell">SIS.CRS.run("file:///<var>&lt;directory&gt;</var>/data/coordinate-transformations/OperationChain.xml#DART")</span>
+<span class="echo">command&gt; sis crs "file:///<var>&lt;directory&gt;</var>/data/coordinate-transformations/OperationChain.xml#DART"</span>
+<span class="output">CompoundCRS["DART CRS + time",
+  EngineeringCRS["DART spacecraft spherical CRS",
+    EngineeringDatum["DART center of mass"],
+    CS[spherical, 3],
+      Axis["Relative bearing (V)", CLOCKWISE, Unit["arc-second", 4.84813681109536E-6]],
+      Axis["Altitude (α)", up, Unit["arc-second", 4.84813681109536E-6]],
+      Axis["Distance (D)", AWAY_FROM, Unit["kilometre", 1000]],
+    Id["JPL", -135, Citation["JPL:HORIZONS"]]],
+  TimeCRS["Truncated Julian days",
+    TimeDatum["Truncated Julian epoch", TimeOrigin[1968-05-24]],
+    CS[temporal, 1],
+      Axis["Time (t)", future],
+      TimeUnit["day", 86400],
+    Id["TB19-D001", "TimeCRS"]],
+  Scope["Testbed 19 demonstration."],
+  Id["TB19-D001", "DART"]]</span>
 
 <span class="jshell">/exit</span></pre>
 
-    <h2>Coordinate transformations</h2>
     <p>
-      The Coordinate Reference System (<abbr>CRS</abbr>) encoded in GeoTIFF does not specify how this <abbr>CRS</abbr>
-      is related to the Earth or other bodies. This relationship is specified in separated files,
-      using Geographic Markup Language (<abbr>GML</abbr>) in the Testbed-19 experiment.
+      Points in the <abbr title="Comma Separated Values">CSV</abbr> file can be transformed
+      with the following command in the JShell environment.
+      See the Testbed 19 engineering report for more explanation about the content of the <abbr>GML</abbr> files
+      that are read by this demo.
+    </p>
+
+  <pre><span class="jshell">SIS.TRANSFORM.inverse().operation("data/coordinate-transformations/OperationChain.xml").run("data/PointOfInterests.csv")</span>
+<span class="echo">command&gt; sis transform --inverse --operation "data/coordinate-transformations/OperationChain.xml" "data/PointOfInterests.csv"</span>
+<span class="output"># Source :     DART CRS + time (TB19-D001:DART)
+# Target :     Dimorphos CRS + time (TB19-D001:DimorphosCRS)
+# Operations : Dimorphos to DART (TB19-D001:DimorphosToDART)
+# Domain  :    Unknown
+
+         X (km),         Y (km),         Z (km),       Time (d)
+   32368.631542, -111486.252095,  -52616.071373,   19851.666667
+ -316291.614923,  332683.160016,  125381.007799,   19848.000000</span>
+
+<span class="jshell">/exit</span></pre>
+
+    <p>
       The execution of a chain of operations up to pixel coordinates in above GeoTIFF image
       is performed by the <code>org.opengis.testbed.T19D001.Demo</code> Java file in the
       <a href="https://github.com/opengeospatial/testbed_resources/tree/main/Testbed-19/space">GitHub repository</a>
       As of January 2024, this demo requires a local build of Apache SIS from the above-cited sources.
-      This is because the features experimented in Testbed-19 are not yet integrated in OGC standards.
+      This is because the features experimented in Testbed 19 are not yet integrated in OGC standards.
     </p>
+
   </body>
 </html>
