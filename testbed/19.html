@@ -8,6 +8,7 @@
   </head>
   <body>
     <h1>OGC TestBed-19</h1>
+    <p><b>Last updated:</b> February 2th, 2024</p>
     <p>
       The <abbr title="Open Geospatial Consortium">OGC</abbr> TestBed-19 proposes extensions to existing
       geospatial standards for handling data in space. At the most fundamental level, a few changes were
@@ -86,13 +87,12 @@
       This demonstration transforms the points
       <a href="https://github.com/opengeospatial/testbed_resources/blob/main/Testbed-19/space/data/PointOfInterests.csv">listed in a <abbr title="Comma Separated Values">CSV</abbr> file</a>.
       Coordinates are expressed in above DART Engineering <abbr>CRS</abbr> extended to a four-dimensional space.
-      That four-dimensional <abbr>CRS</abbr> is described in a <abbr>GML</abbr> file and can be seen with the following command in the JShell environment
-      (replace <var>&lt;directory&gt;</var> by the directory where data were copied –
-      this demo needs a <abbr>URI</abbr> rather than a file path because it references a fragment of the file):
+      That four-dimensional <abbr>CRS</abbr> is described in a <abbr>GML</abbr> file
+      and can be seen with the following command in the JShell environment:
     </p>
 
-  <pre><span class="jshell">SIS.CRS.run("file:///<var>&lt;directory&gt;</var>/data/coordinate-transformations/OperationChain.xml#DART")</span>
-<span class="echo">command&gt; sis crs "file:///<var>&lt;directory&gt;</var>/data/coordinate-transformations/OperationChain.xml#DART"</span>
+  <pre><span class="jshell">SIS.CRS.run("file:data/coordinate-transformations/OperationChain.xml#DART")</span>
+<span class="echo">command&gt; sis crs "file:data/coordinate-transformations/OperationChain.xml#DART"</span>
 <span class="output">CompoundCRS["DART CRS + time",
   EngineeringCRS["DART spacecraft spherical CRS",
     EngineeringDatum["DART center of mass"],
